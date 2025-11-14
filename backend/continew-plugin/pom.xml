@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>top.continew</groupId>
+        <artifactId>continew-admin</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>continew-plugin</artifactId>
+    <packaging>pom</packaging>
+
+    <name>${project.artifactId}</name>
+    <description>插件模块（存放代码生成、任务调度等扩展模块）</description>
+
+    <modules>
+        <module>continew-plugin-schedule</module>
+        <module>continew-plugin-open</module>
+        <module>continew-plugin-generator</module>
+    </modules>
+
+    <dependencies>
+        <!-- 公共模块 -->
+        <dependency>
+            <groupId>top.continew</groupId>
+            <artifactId>continew-common</artifactId>
+        </dependency>
+    </dependencies>
+</project>
