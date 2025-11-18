@@ -5,13 +5,11 @@ import {
   type AccountLoginReq,
   AuthTypeConstants,
   type EmailLoginReq,
-  type PhoneLoginReq,
   type UserInfo,
   accountLogin as accountLoginApi,
   emailLogin as emailLoginApi,
   getUserInfo as getUserInfoApi,
   logout as logoutApi,
-  phoneLogin as phoneLoginApi,
   socialLogin as socialLoginApi,
 } from '@/apis'
 import { clearToken, getToken, setToken } from '@/utils/auth'
@@ -59,13 +57,6 @@ const storeSetup = () => {
   // 邮箱登录
   const emailLogin = async (req: EmailLoginReq) => {
     const res = await emailLoginApi({ ...req, clientId: import.meta.env.VITE_CLIENT_ID, authType: AuthTypeConstants.EMAIL })
-    setToken(res.data.token)
-    token.value = res.data.token
-  }
-
-  // 手机号登录
-  const phoneLogin = async (req: PhoneLoginReq) => {
-    const res = await phoneLoginApi({ ...req, clientId: import.meta.env.VITE_CLIENT_ID, authType: AuthTypeConstants.PHONE })
     setToken(res.data.token)
     token.value = res.data.token
   }
@@ -119,7 +110,6 @@ const storeSetup = () => {
     pwdExpiredShow,
     accountLogin,
     emailLogin,
-    phoneLogin,
     socialLogin,
     logout,
     logoutCallBack,

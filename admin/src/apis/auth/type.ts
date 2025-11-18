@@ -42,11 +42,10 @@ export interface RouteItem {
 }
 
 /** 认证类型 */
-export type AuthType = 'ACCOUNT' | 'PHONE' | 'EMAIL' | 'SOCIAL'
+export type AuthType = 'ACCOUNT' | 'EMAIL' | 'SOCIAL'
 
 export const AuthTypeConstants = {
   ACCOUNT: 'ACCOUNT',
-  PHONE: 'PHONE',
   EMAIL: 'EMAIL',
   SOCIAL: 'SOCIAL',
 } as const
@@ -63,12 +62,6 @@ export interface AccountLoginReq extends AuthReq {
   password: string
   captcha: string
   uuid: string
-}
-
-/** 手机号登录请求参数 */
-export interface PhoneLoginReq extends AuthReq {
-  phone: string
-  captcha: string
 }
 
 /** 邮箱登录请求参数 */

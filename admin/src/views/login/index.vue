@@ -20,14 +20,11 @@
             <a-tab-pane key="1" title="账号登录">
               <component :is="AccountLogin" v-if="activeTab === '1'" />
             </a-tab-pane>
-            <a-tab-pane key="2" title="手机号登录">
-              <component :is="PhoneLogin" v-if="activeTab === '2'" />
-            </a-tab-pane>
           </a-tabs>
           <div class="login-right__oauth">
             <a-divider orientation="center">其他登录方式</a-divider>
             <div class="list">
-              <div v-if="isEmailLogin" class="mode item" @click="toggleLoginMode"><icon-user /> 账号/手机号登录</div>
+              <div v-if="isEmailLogin" class="mode item" @click="toggleLoginMode"><icon-user /> 账号登录</div>
               <div v-else class="mode item" @click="toggleLoginMode"><icon-email /> 邮箱登录</div>
               <a class="item" title="使用 Gitee 账号登录" @click="onOauth('gitee')">
                 <GiSvgIcon name="gitee" :size="24" />
@@ -66,9 +63,6 @@
             <a-tab-pane key="1" title="账号登录">
               <component :is="AccountLogin" v-if="activeTab === '1'" />
             </a-tab-pane>
-            <a-tab-pane key="2" title="手机号登录">
-              <component :is="PhoneLogin" v-if="activeTab === '2'" />
-            </a-tab-pane>
           </a-tabs>
         </div>
       </a-col>
@@ -76,7 +70,7 @@
     <div class="login-right__oauth">
       <a-divider orientation="center">其他登录方式</a-divider>
       <div class="list">
-        <div v-if="isEmailLogin" class="mode item" @click="toggleLoginMode"><icon-user /> 账号/手机号登录</div>
+        <div v-if="isEmailLogin" class="mode item" @click="toggleLoginMode"><icon-user /> 账号登录</div>
         <div v-else class="mode item" @click="toggleLoginMode"><icon-email /> 邮箱登录</div>
         <a class="item" title="使用 Gitee 账号登录" @click="onOauth('gitee')">
           <GiSvgIcon name="gitee" :size="24" />
@@ -93,7 +87,6 @@
 import { computed, ref } from 'vue'
 import Background from './components/background/index.vue'
 import AccountLogin from './components/account/index.vue'
-import PhoneLogin from './components/phone/index.vue'
 import EmailLogin from './components/email/index.vue'
 import { socialAuth } from '@/apis/auth'
 import { useAppStore } from '@/stores'

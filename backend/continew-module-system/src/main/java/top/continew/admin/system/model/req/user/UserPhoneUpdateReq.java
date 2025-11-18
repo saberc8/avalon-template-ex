@@ -19,7 +19,6 @@ package top.continew.admin.system.model.req.user;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-import org.hibernate.validator.constraints.Length;
 import top.continew.starter.core.validation.constraints.Mobile;
 
 import java.io.Serial;
@@ -45,14 +44,6 @@ public class UserPhoneUpdateReq implements Serializable {
     @NotBlank(message = "新手机号不能为空")
     @Mobile(message = "新手机号格式不正确")
     private String phone;
-
-    /**
-     * 验证码
-     */
-    @Schema(description = "验证码", example = "888888")
-    @NotBlank(message = "验证码不能为空")
-    @Length(max = 6, message = "验证码无效")
-    private String captcha;
 
     /**
      * 当前密码（加密）

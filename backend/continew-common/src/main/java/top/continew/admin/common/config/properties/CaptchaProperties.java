@@ -44,11 +44,6 @@ public class CaptchaProperties {
     private CaptchaMail mail;
 
     /**
-     * 短信验证码配置
-     */
-    private CaptchaSms sms;
-
-    /**
      * 邮箱验证码配置
      */
     @Data
@@ -69,29 +64,4 @@ public class CaptchaProperties {
         private String templatePath;
     }
 
-    /**
-     * 短信验证码配置
-     */
-    @Data
-    public static class CaptchaSms {
-        /**
-         * 内容长度
-         */
-        private int length;
-
-        /**
-         * 过期时间
-         */
-        private long expirationInMinutes;
-
-        /**
-         * 验证码字段模板键名
-         */
-        private String codeKey = "code";
-
-        /**
-         * 失效时间字段模板键名
-         */
-        private String timeKey = "expirationInMinutes";
-    }
 }

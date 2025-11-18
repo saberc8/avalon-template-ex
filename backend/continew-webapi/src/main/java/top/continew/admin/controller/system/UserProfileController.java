@@ -33,7 +33,6 @@ import me.zhyd.oauth.request.AuthRequest;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import top.continew.admin.common.constant.CacheConstants;
 import top.continew.admin.common.context.UserContextHolder;
 import top.continew.admin.common.util.SecureUtils;
 import top.continew.admin.system.enums.SocialSourceEnum;
@@ -46,7 +45,6 @@ import top.continew.admin.system.model.resp.AvatarResp;
 import top.continew.admin.system.model.resp.user.UserSocialBindResp;
 import top.continew.admin.system.service.UserService;
 import top.continew.admin.system.service.UserSocialService;
-import top.continew.starter.cache.redisson.util.RedisUtils;
 import top.continew.starter.core.exception.BadRequestException;
 import top.continew.starter.core.util.ExceptionUtils;
 import top.continew.starter.core.validation.ValidationUtils;
@@ -68,7 +66,6 @@ import java.util.List;
 public class UserProfileController {
 
     private static final String DECRYPT_FAILED = "当前密码解密失败";
-    private static final String CAPTCHA_EXPIRED = "验证码已失效";
     private final UserService userService;
     private final UserSocialService userSocialService;
     private final JustAuthProperties authProperties;
@@ -105,11 +102,6 @@ public class UserProfileController {
         String rawOldPassword = ExceptionUtils.exToNull(() -> SecureUtils.decryptByRsaPrivateKey(updateReq
             .getOldPassword()));
         ValidationUtils.throwIfBlank(rawOldPassword, DECRYPT_FAILED);
-        String captchaKey = CacheConstants.CAPTCHA_KEY_PREFIX + updateReq.getPhone();
-        String captcha = RedisUtils.get(captchaKey);
-        ValidationUtils.throwIfBlank(captcha, CAPTCHA_EXPIRED);
-        ValidationUtils.throwIfNotEqualIgnoreCase(updateReq.getCaptcha(), captcha, "验证码不正确");
-        RedisUtils.delete(captchaKey);
         userService.updatePhone(updateReq.getPhone(), rawOldPassword, UserContextHolder.getUserId());
     }
 

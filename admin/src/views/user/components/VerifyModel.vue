@@ -25,7 +25,7 @@
 import { useWindowSize } from '@vueuse/core'
 import { Message } from '@arco-design/web-vue'
 import NProgress from 'nprogress'
-import { type BehaviorCaptchaReq, getEmailCaptcha, getSmsCaptcha, updateUserEmail, updateUserPassword, updateUserPhone } from '@/apis'
+import { type BehaviorCaptchaReq, getEmailCaptcha, updateUserEmail, updateUserPassword, updateUserPhone } from '@/apis'
 import { encryptByRsa } from '@/utils/encrypt'
 import { useUserStore } from '@/stores'
 import { type ColumnItem, GiForm } from '@/components/GiForm'
@@ -90,7 +90,8 @@ const columns: ColumnItem[] = reactive([
     span: 24,
     rules: [{ required: true, message: '请输入验证码' }],
     hide: () => {
-      return !['phone', 'email'].includes(verifyType.value)
+      // 仅修改邮箱时需要验证码
+      return verifyType.value !== 'email'
     },
   },
   {
@@ -156,6 +157,7 @@ const captchaMode = ref('pop')
 const captchaLoading = ref(false)
 // 弹出行为验证码
 const onCaptcha = async () => {
+  if (verifyType.value !== 'email') return
   if (captchaLoading.value) return
   const isInvalid = await formRef.value?.formRef?.validateField(verifyType.value === 'phone' ? 'phone' : 'email')
   if (isInvalid) return
@@ -189,9 +191,7 @@ const getCaptcha = async (captchaReq: BehaviorCaptchaReq) => {
   try {
     captchaLoading.value = true
     captchaBtnName.value = '发送中...'
-    if (verifyType.value === 'phone') {
-      await getSmsCaptcha(form.phone, captchaReq)
-    } else if (verifyType.value === 'email') {
+    if (verifyType.value === 'email') {
       await getEmailCaptcha(form.email, captchaReq)
     }
     captchaLoading.value = false
@@ -221,7 +221,6 @@ const save = async () => {
     if (verifyType.value === 'phone') {
       await updateUserPhone({
         phone: form.phone,
-        captcha: form.captcha,
         oldPassword: encryptByRsa(form.oldPassword) as string,
       })
       Message.success('修改成功')

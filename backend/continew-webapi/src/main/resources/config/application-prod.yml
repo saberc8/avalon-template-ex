@@ -169,27 +169,6 @@ captcha:
     expirationInMinutes: 5
     # 模板路径
     templatePath: mail/captcha.ftl
-  ## 短信验证码配置
-  sms:
-    # 内容长度
-    length: 6
-    # 过期时间
-    expirationInMinutes: 5
-
---- ### 短信配置
-## 提示：配置文件方式和 [系统管理/系统配置/短信配置] 功能可任选其一方式使用，也可共同使用，但实际开发时建议选择一种，注释或删除另一方
-sms:
-  is-print: false
-#  # 从 YAML 读取配置
-#  config-type: YAML
-#  blends:
-#    cloopen:
-#      # 短信厂商
-#      supplier: cloopen
-#      base-url: https://app.cloopen.com:8883/2013-12-26
-#      access-key-id: 你的Access Key
-#      access-key-secret: 你的Secret Key
-#      sdk-app-id: 你的应用ID
 
 --- ### 邮件配置
 ## 提示：配置文件方式和 [系统管理/系统配置/邮件配置] 功能可任选其一方式使用，实际开发时请注释或删除另一方

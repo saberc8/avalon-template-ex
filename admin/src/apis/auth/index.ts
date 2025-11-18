@@ -10,11 +10,6 @@ export function accountLogin(req: T.AccountLoginReq) {
   return http.post<T.LoginResp>(`${BASE_URL}/login`, req)
 }
 
-/** @desc 手机号登录 */
-export function phoneLogin(req: T.PhoneLoginReq) {
-  return http.post<T.LoginResp>(`${BASE_URL}/login`, req)
-}
-
 /** @desc 邮箱登录 */
 export function emailLogin(req: T.EmailLoginReq) {
   return http.post<T.LoginResp>(`${BASE_URL}/login`, req)

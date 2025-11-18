@@ -375,61 +375,6 @@ export interface LoginConfig {
   LOGIN_CAPTCHA_ENABLED: OptionResp
 }
 
-/** 短信配置类型 */
-export interface SmsConfigResp {
-  id: string
-  name: string
-  supplier: string
-  accessKey: string
-  secretKey: string
-  signature: string
-  templateId: string
-  weight: string
-  retryInterval: string
-  maxRetries: string
-  maximum: string
-  supplierConfig: string
-  status: number
-  isDefault: boolean
-  createUser: string
-  createTime: string
-  updateUser: string
-  updateTime: string
-  createUserString: string
-  updateUserString: string
-  disabled: boolean
-}
-export interface SmsConfigQuery {
-  name: string | undefined
-  supplier: string | undefined
-  accessKey: string | undefined
-  sort: Array<string>
-}
-export interface SmsConfigPageQuery extends SmsConfigQuery, PageQuery {}
-
-/** 短信日志类型 */
-export interface SmsLogResp {
-  id: string
-  configId: string
-  phone: string
-  params: string
-  status: number
-  resMsg: string
-  createUser: string
-  createTime: string
-  updateUser: string
-  updateTime: string
-  createUserString: string
-  updateUserString: string
-}
-export interface SmsLogQuery {
-  configId: string | undefined
-  phone: string | undefined
-  status: number | undefined
-  sort: Array<string>
-}
-export interface SmsLogPageQuery extends SmsLogQuery, PageQuery {}
-
 /** 绑定三方账号信息 */
 export interface BindSocialAccountRes {
   source: string
