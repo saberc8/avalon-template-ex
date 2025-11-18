@@ -46,12 +46,6 @@
             <artifactId>continew-plugin-open</artifactId>
         </dependency>
 
-        <!-- 代码生成器插件 -->
-        <dependency>
-            <groupId>top.continew</groupId>
-            <artifactId>continew-plugin-generator</artifactId>
-        </dependency>
-
         <!-- ContiNew Starter 日志模块 - 拦截器版（Spring Boot Actuator HttpTrace 增强版） -->
         <dependency>
             <groupId>top.continew</groupId>
