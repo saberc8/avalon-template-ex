@@ -174,35 +174,6 @@ export interface DictItemQuery {
 export interface DictItemPageQuery extends DictItemQuery, PageQuery {
 }
 
-/** 公告类型 */
-export interface NoticeResp {
-  id?: string
-  title?: string
-  type: string
-  noticeScope: number
-  noticeMethods?: Array<number>
-  isTiming: boolean
-  publishTime?: string
-  isTop: boolean
-  status?: number
-}
-export type NoticeDetailResp = NoticeResp & {
-  createUserString: string
-  createTime: string
-  updateUserString: string
-  updateTime: string
-}
-export type NoticePreviewResp = NoticeDetailResp & {
-  content: string
-}
-export interface NoticeQuery {
-  title?: string
-  type?: string
-  sort: Array<string>
-}
-export interface NoticePageQuery extends NoticeQuery, PageQuery {
-}
-
 /** 文件类型 */
 export interface FileItem {
   id: string
@@ -368,27 +339,4 @@ export interface LoginConfig {
 export interface BindSocialAccountRes {
   source: string
   description: string
-}
-
-/** 系统消息类型 */
-export interface MessageResp {
-  id: string
-  title: string
-  content: string
-  type: number
-  path: string
-  isRead: boolean
-  readTime?: string
-  createUserString?: string
-  createTime: string
-}
-
-export interface MessageQuery {
-  title?: string
-  type?: number
-  isRead?: boolean
-  sort: Array<string>
-}
-
-export interface MessagePageQuery extends MessageQuery, PageQuery {
 }

@@ -6,14 +6,6 @@ export interface ImageCaptchaResp {
   isEnabled: boolean
 }
 
-/** 仪表盘公告类型 */
-export interface DashboardNoticeResp {
-  id: number
-  title: string
-  type: number
-  isTop: boolean
-}
-
 /** 仪表盘访问趋势类型 */
 export interface DashboardAccessTrendResp {
   date: string

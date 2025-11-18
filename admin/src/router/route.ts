@@ -54,18 +54,6 @@ export const systemRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/user/profile/index.vue'),
         meta: { title: '个人中心', showInTabs: false },
       },
-      {
-        path: '/user/message',
-        name: 'UserMessage',
-        component: () => import('@/views/user/message/index.vue'),
-        meta: { title: '消息中心', showInTabs: false },
-      },
-      {
-        path: '/user/notice',
-        name: 'UserNotice',
-        component: () => import('@/views/user/message/components/view/index.vue'),
-        meta: { title: '查看公告' },
-      },
     ],
   },
   {

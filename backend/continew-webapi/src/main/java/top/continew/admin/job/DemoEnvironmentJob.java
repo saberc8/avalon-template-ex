@@ -52,10 +52,6 @@ public class DemoEnvironmentJob {
     private final DictItemMapper dictItemMapper;
     private final DictMapper dictMapper;
     private final StorageMapper storageMapper;
-    private final NoticeMapper noticeMapper;
-    private final NoticeLogMapper noticeLogMapper;
-    private final MessageMapper messageMapper;
-    private final MessageLogMapper messageLogMapper;
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
     private final UserSocialMapper userSocialMapper;
@@ -69,7 +65,6 @@ public class DemoEnvironmentJob {
     private final ClientMapper clientsMapper;
 
     private static final Long DELETE_FLAG = 10000L;
-    private static final Long MESSAGE_FLAG = 0L;
     private static final List<Long> USER_FLAG = List
         .of(1L, 547889293968801822L, 547889293968801823L, 547889293968801824L, 547889293968801825L, 547889293968801826L, 547889293968801827L, 547889293968801828L, 547889293968801829L, 547889293968801830L, 547889293968801831L);
     private static final List<Long> ROLE_FLAG = List.of(1L, 2L, 547888897925840927L, 547888897925840928L);
@@ -91,10 +86,6 @@ public class DemoEnvironmentJob {
             this.log(dictCount, "字典");
             Long storageCount = storageMapper.lambdaQuery().gt(StorageDO::getId, DELETE_FLAG).count();
             this.log(storageCount, "存储");
-            Long noticeCount = noticeMapper.lambdaQuery().gt(NoticeDO::getId, DELETE_FLAG).count();
-            this.log(noticeCount, "公告");
-            Long messageCount = messageMapper.lambdaQuery().count();
-            this.log(messageCount, "通知");
             Long userCount = userMapper.lambdaQuery().notIn(UserDO::getId, USER_FLAG).count();
             this.log(userCount, "用户");
             Long roleCount = roleMapper.lambdaQuery().notIn(RoleDO::getId, ROLE_FLAG).count();
@@ -110,8 +101,6 @@ public class DemoEnvironmentJob {
             InterceptorIgnoreHelper.handle(IgnoreStrategy.builder().blockAttack(true).build());
             SnailJobLog.REMOTE.info("演示环境待清理数据项检测完成，开始执行清理。");
             // 清理关联数据
-            noticeLogMapper.lambdaUpdate().gt(NoticeLogDO::getNoticeId, DELETE_FLAG).remove();
-            messageLogMapper.lambdaUpdate().gt(MessageLogDO::getMessageId, MESSAGE_FLAG).remove();
             userRoleMapper.lambdaUpdate().notIn(UserRoleDO::getRoleId, ROLE_FLAG).remove();
             userRoleMapper.lambdaUpdate().notIn(UserRoleDO::getUserId, USER_FLAG).remove();
             roleDeptMapper.lambdaUpdate().notIn(RoleDeptDO::getRoleId, ROLE_FLAG).remove();
@@ -126,12 +115,6 @@ public class DemoEnvironmentJob {
                 .remove());
             this.clean(storageCount, "存储", null, () -> storageMapper.lambdaUpdate()
                 .gt(StorageDO::getId, DELETE_FLAG)
-                .remove());
-            this.clean(noticeCount, "公告", null, () -> noticeMapper.lambdaUpdate()
-                .gt(NoticeDO::getId, DELETE_FLAG)
-                .remove());
-            this.clean(messageCount, "通知", null, () -> messageMapper.lambdaUpdate()
-                .gt(MessageDO::getId, MESSAGE_FLAG)
                 .remove());
             this.clean(userCount, "用户", null, () -> userMapper.lambdaUpdate().notIn(UserDO::getId, USER_FLAG).remove());
             this.clean(roleCount, "角色", null, () -> roleMapper.lambdaUpdate().notIn(RoleDO::getId, ROLE_FLAG).remove());

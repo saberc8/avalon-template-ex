@@ -32,10 +32,8 @@ import org.springframework.stereotype.Service;
 import top.continew.admin.system.mapper.LogMapper;
 import top.continew.admin.system.model.resp.dashboard.DashboardAccessTrendResp;
 import top.continew.admin.system.model.resp.dashboard.DashboardChartCommonResp;
-import top.continew.admin.system.model.resp.dashboard.DashboardNoticeResp;
 import top.continew.admin.system.model.resp.dashboard.DashboardOverviewCommonResp;
 import top.continew.admin.system.service.DashboardService;
-import top.continew.admin.system.service.NoticeService;
 import top.continew.starter.core.constant.StringConstants;
 
 import java.io.IOException;
@@ -53,12 +51,6 @@ import java.util.*;
 public class DashboardServiceImpl implements DashboardService {
 
     private final LogMapper logMapper;
-    private final NoticeService noticeService;
-
-    @Override
-    public List<DashboardNoticeResp> listNotice() {
-        return noticeService.listDashboard();
-    }
 
     @Override
     public DashboardOverviewCommonResp getOverviewPv() {

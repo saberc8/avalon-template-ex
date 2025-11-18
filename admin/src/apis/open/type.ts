@@ -19,3 +19,4 @@ export interface AppQuery {
 }
 
 export interface AppPageQuery extends AppQuery, PageQuery {}
+

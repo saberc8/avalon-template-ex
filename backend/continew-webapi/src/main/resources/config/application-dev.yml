@@ -40,6 +40,8 @@ spring.liquibase:
   enabled: true
   # 配置文件路径
   change-log: classpath:/db/changelog/db.changelog-master.yaml
+  # 变更了历史 changeset（仅开发环境使用），启动时自动清理并重算校验和
+  clear-checksums: true
 
 --- ### 缓存配置
 spring.data:

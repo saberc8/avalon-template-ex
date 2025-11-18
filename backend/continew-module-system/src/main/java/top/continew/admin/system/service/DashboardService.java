@@ -18,7 +18,6 @@ package top.continew.admin.system.service;
 
 import top.continew.admin.system.model.resp.dashboard.DashboardAccessTrendResp;
 import top.continew.admin.system.model.resp.dashboard.DashboardChartCommonResp;
-import top.continew.admin.system.model.resp.dashboard.DashboardNoticeResp;
 import top.continew.admin.system.model.resp.dashboard.DashboardOverviewCommonResp;
 
 import java.io.IOException;
@@ -31,13 +30,6 @@ import java.util.List;
  * @since 2023/9/8 21:32
  */
 public interface DashboardService {
-
-    /**
-     * 查询公告列表
-     *
-     * @return 公告列表
-     */
-    List<DashboardNoticeResp> listNotice();
 
     /**
      * 查询 PV 总览

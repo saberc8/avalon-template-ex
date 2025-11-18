@@ -119,5 +119,11 @@ const onUpdate = async (id: string) => {
   visible.value = true
 }
 
-defineExpose({ onAdd, onUpdate })
+defineExpose({
+  onAdd,
+  onUpdate,
+})
 </script>
+
+<style scoped lang="scss"></style>
+

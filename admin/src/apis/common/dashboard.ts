@@ -5,11 +5,6 @@ export type * from './type'
 
 const BASE_URL = '/dashboard'
 
-/** @desc 查询公告列表 */
-export function listDashboardNotice() {
-  return http.get<T.DashboardNoticeResp[]>(`${BASE_URL}/notice`)
-}
-
 /** @desc 查询 PV 总览 */
 export function getDashboardOverviewPv() {
   return http.get<T.DashboardOverviewCommonResp>(`${BASE_URL}/analysis/overview/pv`)

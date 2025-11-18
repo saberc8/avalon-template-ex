@@ -44,3 +44,4 @@ export function getAppSecret(id: string) {
 export function resetAppSecret(id: string) {
   return http.patch(`${BASE_URL}/${id}/secret`)
 }
+

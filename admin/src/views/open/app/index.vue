@@ -87,25 +87,19 @@
 <script setup lang="ts">
 import type { TableInstance } from '@arco-design/web-vue'
 import { Message, Modal } from '@arco-design/web-vue'
+import { type AppQuery, type AppResp, deleteApp, exportApp, getApp, getAppSecret, listApp, resetAppSecret } from '@/apis/open/app'
 import AppAddModal from './AppAddModal.vue'
 import AppDetailDrawer from './AppDetailDrawer.vue'
-import {
-  type AppQuery,
-  type AppResp,
-  deleteApp,
-  exportApp,
-  getAppSecret,
-  listApp,
-  resetAppSecret,
-} from '@/apis/open/app'
-import { useDownload, useTable } from '@/hooks'
-import { isMobile } from '@/utils'
-import has from '@/utils/has'
+import { useTable } from '@/hooks'
+import { useHasPermission } from '@/hooks/app'
+import { useDownload } from '@/hooks/file'
 
 defineOptions({ name: 'OpenApp' })
 
+const has = useHasPermission()
+
 const queryForm = reactive<AppQuery>({
-  sort: ['id,desc'],
+  sort: ['createTime,desc'],
 })
 
 const {
@@ -113,29 +107,37 @@ const {
   loading,
   pagination,
   search,
-  handleDelete,
 } = useTable((page) => listApp({ ...queryForm, ...page }), { immediate: true })
+
 const columns: TableInstance['columns'] = [
   {
     title: '序号',
     width: 66,
     align: 'center',
     render: ({ rowIndex }) => h('span', {}, rowIndex + 1 + (pagination.current - 1) * pagination.pageSize),
-    fixed: !isMobile() ? 'left' : undefined,
   },
-  { title: '名称', dataIndex: 'name', slotName: 'name', ellipsis: true, tooltip: true, fixed: !isMobile() ? 'left' : undefined },
-  { title: 'Access Key', dataIndex: 'accessKey', slotName: 'accessKey', width: 200 },
-  { title: 'Secret Key', dataIndex: 'secretKey', slotName: 'secretKey', width: 200 },
-  { title: '失效时间', dataIndex: 'expireTime', width: 180 },
-  { title: '状态', dataIndex: 'status', slotName: 'status', width: 80, align: 'center' },
-  { title: '描述', dataIndex: 'description', ellipsis: true, tooltip: true },
-  { title: '创建人', dataIndex: 'createUserString', ellipsis: true, tooltip: true, show: false },
-  { title: '创建时间', dataIndex: 'createTime', width: 180 },
-  { title: '修改人', dataIndex: 'updateUserString', ellipsis: true, tooltip: true, show: false },
-  { title: '修改时间', dataIndex: 'updateTime', width: 180, show: false },
+  { title: '名称', dataIndex: 'name' },
+  { title: 'Access Key', dataIndex: 'accessKey', slotName: 'accessKey' },
+  { title: 'Secret Key', dataIndex: 'secretKey', slotName: 'secretKey' },
+  {
+    title: '状态',
+    dataIndex: 'status',
+    slotName: 'status',
+    align: 'center',
+  },
+  {
+    title: '创建人',
+    dataIndex: 'createUserString',
+    ellipsis: true,
+    tooltip: true,
+  },
+  {
+    title: '创建时间',
+    dataIndex: 'createTime',
+    width: 180,
+  },
   {
     title: '操作',
-    dataIndex: 'action',
     slotName: 'action',
     width: 190,
     align: 'center',
@@ -206,11 +208,6 @@ const onAdd = () => {
   AppAddModalRef.value?.onAdd()
 }
 
-// 修改
-const onUpdate = (record: AppResp) => {
-  AppAddModalRef.value?.onUpdate(record.id)
-}
-
 const AppDetailDrawerRef = ref<InstanceType<typeof AppDetailDrawer>>()
 // 详情
 const onDetail = (record: AppResp) => {
@@ -219,3 +216,4 @@ const onDetail = (record: AppResp) => {
 </script>
 
 <style scoped lang="scss"></style>
+

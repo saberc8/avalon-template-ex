@@ -65,3 +65,4 @@ public class AppController extends BaseController<AppService, AppResp, AppDetail
         baseService.resetSecret(id);
     }
 }
+
