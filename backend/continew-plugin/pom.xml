@@ -17,7 +17,6 @@
 
     <modules>
         <module>continew-plugin-schedule</module>
-        <module>continew-plugin-open</module>
     </modules>
 
     <dependencies>

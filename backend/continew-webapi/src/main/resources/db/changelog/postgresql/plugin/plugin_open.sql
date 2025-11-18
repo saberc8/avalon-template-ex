@@ -37,8 +37,6 @@ COMMENT ON TABLE  "sys_app"                   IS '应用表';
 INSERT INTO "sys_menu"
 ("id", "title", "parent_id", "type", "path", "name", "component", "redirect", "icon", "is_external", "is_cache", "is_hidden", "permission", "sort", "status", "create_user", "create_time")
 VALUES
-(7000, '能力开放', 0, 1, '/open', 'Open', 'Layout', '/open/app', 'expand', false, false, false, NULL, 7, 1, 1, NOW()),
-(7010, '应用管理', 7000, 2, '/open/app', 'OpenApp', 'open/app/index', NULL, 'common', false, false, false, NULL, 1, 1, 1, NOW()),
 (7011, '列表', 7010, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'open:app:list', 1, 1, 1, NOW()),
 (7012, '详情', 7010, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'open:app:get', 2, 1, 1, NOW()),
 (7013, '新增', 7010, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'open:app:create', 3, 1, 1, NOW()),
