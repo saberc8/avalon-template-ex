@@ -359,17 +359,6 @@ export interface SecurityConfig {
   PASSWORD_REQUIRE_SYMBOLS: OptionResp
 }
 
-/** 邮箱配置类型 */
-export interface MailConfig {
-  MAIL_PROTOCOL: OptionResp
-  MAIL_HOST: OptionResp
-  MAIL_PORT: OptionResp
-  MAIL_USERNAME: OptionResp
-  MAIL_PASSWORD: OptionResp
-  MAIL_SSL_ENABLED: OptionResp
-  MAIL_SSL_PORT: OptionResp
-}
-
 /** 登录配置类型 */
 export interface LoginConfig {
   LOGIN_CAPTCHA_ENABLED: OptionResp

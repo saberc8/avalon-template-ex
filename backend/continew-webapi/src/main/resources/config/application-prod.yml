@@ -170,22 +170,6 @@ captcha:
     # 模板路径
     templatePath: mail/captcha.ftl
 
---- ### 邮件配置
-## 提示：配置文件方式和 [系统管理/系统配置/邮件配置] 功能可任选其一方式使用，实际开发时请注释或删除另一方
-#spring.mail:
-#  # 根据需要更换
-#  host: smtp.126.com
-#  port: 465
-#  username: 你的邮箱
-#  password: 你的邮箱授权码
-#  properties:
-#    mail:
-#      smtp:
-#        auth: true
-#        socketFactory:
-#          class: javax.net.ssl.SSLSocketFactory
-#          port: 465
-
 --- ### WebSocket 配置
 continew-starter.messaging.websocket:
   enabled: true

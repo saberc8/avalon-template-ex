@@ -1,12 +1,12 @@
 --- ### 项目配置
 project:
   # URL（跨域配置默认放行此 URL，第三方登录回调默认使用此 URL 为前缀，请注意更改为你实际的前端 URL）
-  url: http://localhost:5173
+  url: http://localhost:4399
 
 --- ### 服务器配置
 server:
   # HTTP 端口（默认 8080）
-  port: 8000
+  port: 4398
 
 --- ### 数据源配置
 spring.datasource:
@@ -160,22 +160,6 @@ captcha:
     expirationInMinutes: 5
     # 模板路径
     templatePath: mail/captcha.ftl
-
---- ### 邮件配置
-## 提示：配置文件方式和 [系统管理/系统配置/邮件配置] 功能可任选其一方式使用，实际开发时请注释或删除另一方
-#spring.mail:
-#  # 根据需要更换
-#  host: smtp.126.com
-#  port: 465
-#  username: 你的邮箱
-#  password: 你的邮箱授权码
-#  properties:
-#    mail:
-#      smtp:
-#        auth: true
-#        socketFactory:
-#          class: javax.net.ssl.SSLSocketFactory
-#          port: 465
 
 --- ### WebSocket 配置
 continew-starter.messaging.websocket:

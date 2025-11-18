@@ -39,7 +39,6 @@ import { useRoute, useRouter } from 'vue-router'
 import SiteConfig from './site/index.vue'
 import SecurityConfig from './security/index.vue'
 import LoginConfig from './login/index.vue'
-import MailConfig from './mail/index.vue'
 import StorageConfig from './storage/index.vue'
 import ClientConfig from './client/index.vue'
 import { useDevice } from '@/hooks'
@@ -53,7 +52,6 @@ const data = [
   { name: '网站配置', key: 'site', icon: 'apps', permissions: ['system:siteConfig:get'], value: SiteConfig },
   { name: '安全配置', key: 'security', icon: 'safe', permissions: ['system:securityConfig:get'], value: SecurityConfig },
   { name: '登录配置', key: 'login', icon: 'lock', permissions: ['system:loginConfig:get'], value: LoginConfig },
-  { name: '邮件配置', key: 'mail', icon: 'email', permissions: ['system:mailConfig:get'], value: MailConfig },
   { name: '存储配置', key: 'storage', icon: 'storage', permissions: ['system:storage:list'], value: StorageConfig },
   { name: '客户端配置', key: 'client', icon: 'mobile', permissions: ['system:client:list'], value: ClientConfig },
 ]
