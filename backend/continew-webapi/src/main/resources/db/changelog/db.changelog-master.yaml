@@ -6,8 +6,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/mysql/main_data.sql
   - include:
-      file: db/changelog/mysql/add_banner.sql
-  - include:
       file: db/changelog/mysql/plugin/plugin_schedule.sql
   - include:
       file: db/changelog/mysql/plugin/plugin_open.sql

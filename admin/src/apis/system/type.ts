@@ -275,27 +275,6 @@ export interface StorageQuery {
   sort: Array<string>
 }
 
-/** Banner 类型 */
-export interface BannerResp {
-  id: string
-  title: string
-  imageUrl: string
-  linkUrl?: string
-  sort: number
-  status: number
-  remark?: string
-  createUserString: string
-  createTime: string
-  updateUserString: string
-  updateTime: string
-}
-export interface BannerQuery {
-  keyword?: string
-  status?: number
-  sort: Array<string>
-}
-export interface BannerPageQuery extends BannerQuery, PageQuery {}
-
 /** 客户端类型 */
 export interface ClientResp {
   id: string
