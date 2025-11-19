@@ -28,9 +28,7 @@
     <modules>
         <module>continew-webapi</module>
         <module>continew-module-system</module>
-        <module>continew-plugin</module>
         <module>continew-common</module>
-        <module>continew-extension</module>
     </modules>
 
     <properties>

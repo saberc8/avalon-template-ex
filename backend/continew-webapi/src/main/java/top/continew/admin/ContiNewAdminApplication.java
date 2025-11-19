@@ -31,7 +31,6 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
-import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.continew.starter.core.autoconfigure.project.ProjectProperties;
@@ -50,7 +49,6 @@ import top.continew.starter.web.model.R;
 @EnableMethodCache(basePackages = "top.continew.admin")
 @EnableGlobalResponse
 @EnableCrudRestController
-@EnableFeignClients
 @RestController
 @SpringBootApplication
 @RequiredArgsConstructor
