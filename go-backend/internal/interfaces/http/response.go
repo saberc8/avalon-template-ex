@@ -17,6 +17,12 @@ type APIResponse[T any] struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// PageResult represents a generic paginated result.
+type PageResult[T any] struct {
+	List  []T   `json:"list"`
+	Total int64 `json:"total"`
+}
+
 // nowString returns current time as epoch milliseconds string,
 // matching the front-end expectation (Number(res.timestamp)).
 func nowString() string {

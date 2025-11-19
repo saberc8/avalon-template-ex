@@ -59,7 +59,8 @@ func BuildRouteTree(menus []rbac.Menu, roles []string) []RouteItem {
 	nodeMap := make(map[int64]*RouteItem, len(list))
 	var roots []RouteItem
 	for _, m := range list {
-		item := RouteItem{
+		// Use a fresh composite literal so each map entry has its own stable pointer.
+		nodeMap[m.ID] = &RouteItem{
 			ID:         m.ID,
 			Title:      m.Title,
 			ParentID:   m.ParentID,
@@ -84,18 +85,25 @@ func BuildRouteTree(menus []rbac.Menu, roles []string) []RouteItem {
 			ShowInTabs: true,
 			Affix:      false,
 		}
-		nodeMap[m.ID] = &item
 	}
 
 	// Second pass to build parent-child relationships.
+	// First, wire up children using pointers only so the tree structure
+	// is complete regardless of map iteration order.
 	for _, item := range nodeMap {
 		if item.ParentID == 0 {
-			roots = append(roots, *item)
 			continue
 		}
 		if parent, ok := nodeMap[item.ParentID]; ok {
 			parent.Children = append(parent.Children, *item)
-		} else {
+		}
+	}
+	// Then, collect roots as value copies after children are attached.
+	for _, item := range nodeMap {
+		if item.ParentID == 0 {
+			roots = append(roots, *item)
+		} else if _, ok := nodeMap[item.ParentID]; !ok {
+			// Orphan node: treat as root.
 			roots = append(roots, *item)
 		}
 	}
@@ -119,4 +127,3 @@ func BuildRouteTree(menus []rbac.Menu, roles []string) []RouteItem {
 
 	return roots
 }
-

@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	appauth "voc-go-backend/internal/application/auth"
+	rbacdomain "voc-go-backend/internal/domain/rbac"
 	"voc-go-backend/internal/domain/user"
 	"voc-go-backend/internal/infrastructure/db"
-	rbacdomain "voc-go-backend/internal/domain/rbac"
-	persistence "voc-go-backend/internal/infrastructure/persistence/user"
 	rbacp "voc-go-backend/internal/infrastructure/persistence/rbac"
+	persistence "voc-go-backend/internal/infrastructure/persistence/user"
 	"voc-go-backend/internal/infrastructure/security"
 	httpif "voc-go-backend/internal/interfaces/http"
 )
@@ -40,6 +40,7 @@ func main() {
 		log.Fatalf("failed to init RSA decryptor: %v", err)
 	}
 	pwdVerifier := security.BcryptVerifier{}
+	pwdHasher := security.BcryptHasher{}
 
 	jwtSecret := getenvDefault("AUTH_JWT_SECRET", "asdasdasifhueuiwyurfewbfjsdafjk")
 	tokenTTL := 24 * time.Hour
@@ -54,8 +55,29 @@ func main() {
 	// 4. 初始化 HTTP 服务（Gin）
 	r := gin.Default()
 
+	// 全局 CORS（开发阶段允许前端本地调试）
+	r.Use(func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		// 只在本地开发时放开 localhost:3000，如需更多域名可按需扩展
+		if origin == "http://localhost:3000" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Vary", "Origin")
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+
+		// 预检请求直接返回
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	// 公共接口
-	commonHandler := httpif.NewCommonHandler()
+	commonHandler := httpif.NewCommonHandler(pg)
 	commonHandler.RegisterCommonRoutes(r)
 
 	// 验证码接口（简化版）
@@ -67,6 +89,26 @@ func main() {
 	authHandler.RegisterAuthRoutes(r)
 	userHandler := httpif.NewUserHandler(userRepo, roleRepo, menuRepo, tokenSvc)
 	userHandler.RegisterUserRoutes(r)
+
+	// 系统管理：菜单管理
+	menuHandler := httpif.NewMenuHandler(pg, tokenSvc)
+	menuHandler.RegisterMenuRoutes(r)
+
+	// 系统管理：角色管理
+	roleHandler := httpif.NewRoleHandler(pg, tokenSvc)
+	roleHandler.RegisterRoleRoutes(r)
+
+	// 系统管理：部门管理（仅树查询）
+	deptHandler := httpif.NewDeptHandler(pg, tokenSvc)
+	deptHandler.RegisterDeptRoutes(r)
+
+	// 系统管理：用户管理
+	systemUserHandler := httpif.NewSystemUserHandler(pg, tokenSvc, rsaDecryptor, pwdHasher)
+	systemUserHandler.RegisterSystemUserRoutes(r)
+
+	// 系统管理：字典管理
+	dictHandler := httpif.NewDictHandler(pg, tokenSvc)
+	dictHandler.RegisterDictRoutes(r)
 
 	// 5. 启动 HTTP 服务
 	port := getenvDefault("HTTP_PORT", "4398")

@@ -12,6 +12,11 @@ type PasswordVerifier interface {
 	Verify(raw, encoded string) (bool, error)
 }
 
+// PasswordHasher hashes a raw password into a stored representation.
+type PasswordHasher interface {
+	Hash(raw string) (string, error)
+}
+
 // BcryptVerifier implements PasswordVerifier for {bcrypt} prefixed hashes
 // as used by Spring Security's DelegatingPasswordEncoder.
 type BcryptVerifier struct{}
@@ -32,5 +37,19 @@ func (BcryptVerifier) Verify(raw, encoded string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// BcryptHasher generates {bcrypt} prefixed hashes compatible with Spring Security.
+type BcryptHasher struct{}
+
+func (BcryptHasher) Hash(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", errors.New("empty password")
+	}
+	bytes, err := bcrypt.GenerateFromPassword([]byte(raw), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return "{bcrypt}" + string(bytes), nil
 }
 
