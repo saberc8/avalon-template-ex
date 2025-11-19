@@ -83,14 +83,6 @@ VALUES
 (1180, '登录配置', 1150, 2, '/system/config?tab=login', 'SystemLoginConfig', 'system/config/login/index', NULL, 'lock', b'0', b'0', b'1', NULL, 3, 1, 1, NOW()),
 (1181, '查询', 1180, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'system:loginConfig:get', 1, 1, 1, NOW()),
 (1182, '修改', 1180, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'system:loginConfig:update', 2, 1, 1, NOW()),
-(1210, '短信配置', 1150, 2, '/system/config?tab=sms', 'SystemSmsConfig', 'system/config/sms/index', NULL, 'message', b'0', b'0', b'1', NULL, 5, 1, 1, NOW()),
-(1211, '列表', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:list', 1, 1, 1, NOW()),
-(1212, '详情', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:get', 2, 1, 1, NOW()),
-(1213, '新增', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:create', 3, 1, 1, NOW()),
-(1214, '修改', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:update', 4, 1, 1, NOW()),
-(1215, '删除', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:delete', 5, 1, 1, NOW()),
-(1216, '导出', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:export', 6, 1, 1, NOW()),
-(1217, '设为默认配置', 1210, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsConfig:setDefault', 7, 1, 1, NOW()),
 (1230, '存储配置', 1150, 2, '/system/config?tab=storage', 'SystemStorage', 'system/config/storage/index', NULL, 'storage', b'0', b'0', b'1', NULL, 6, 1, 1, NOW()),
 (1231, '列表', 1230, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'system:storage:list', 1, 1, 1, NOW()),
 (1232, '详情', 1230, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'system:storage:get', 2, 1, 1, NOW()),
@@ -114,12 +106,7 @@ VALUES
 (2030, '系统日志', 2000, 2, '/monitor/log', 'MonitorLog', 'monitor/log/index', NULL, 'history', b'0', b'0', b'0', NULL, 2, 1, 1, NOW()),
 (2031, '列表', 2030, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'monitor:log:list', 1, 1, 1, NOW()),
 (2032, '详情', 2030, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'monitor:log:get', 2, 1, 1, NOW()),
-(2033, '导出', 2030, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'monitor:log:export', 3, 1, 1, NOW()),
-
-(2050, '短信日志', 2000, 2, '/system/sms/log', 'SystemSmsLog', 'monitor/sms/log/index', NULL, 'message', b'0', b'0', b'0', NULL, 3, 1, 1, NOW()),
-(2051, '列表', 2050, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsLog:list', 1, 1, 1, NOW()),
-(2052, '删除', 2050, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsLog:delete', 2, 1, 1, NOW()),
-(2053, '导出', 2050, 3, NULL, NULL, NULL, NULL, NULL, b'0', b'0', b'0', 'system:smsLog:export', 3, 1, 1, NOW());
+(2033, '导出', 2030, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'monitor:log:export', 3, 1, 1, NOW());
 
 -- 初始化默认部门
 INSERT INTO `sys_dept`
@@ -204,8 +191,7 @@ INSERT INTO `sys_dict`
 (`id`, `name`, `code`, `description`, `is_system`, `create_user`, `create_time`)
 VALUES
 (1, '公告分类', 'notice_type', NULL, b'1', 1, NOW()),
-(2, '客户端类型', 'client_type', NULL, b'1', 1, NOW()),
-(3, '短信厂商', 'sms_supplier', NULL, b'1', 1, NOW());
+(2, '客户端类型', 'client_type', NULL, b'1', 1, NOW());
 
 INSERT INTO `sys_dict_item`
 (`id`, `label`, `value`, `color`, `sort`, `description`, `status`, `dict_id`, `create_user`, `create_time`)
@@ -214,10 +200,7 @@ VALUES
 (2, '企业动态', '2', 'success', 2, NULL, 1, 1, 1, NOW()),
 (3, '桌面端', 'PC', 'primary', 1, NULL, 1, 2, 1, NOW()),
 (4, '安卓', 'ANDROID', 'success', 2, NULL, 1, 2, 1, NOW()),
-(5, '小程序', 'XCX', 'warning', 3, NULL, 1, 2, 1, NOW()),
-(6, '阿里云', 'alibaba', 'warning', 1, NULL, 1, 3, 1, NOW()),
-(7, '腾讯云', 'tencent', 'primary', 2, NULL, 1, 3, 1, NOW()),
-(8, '容联云', 'cloopen', 'success', 3, NULL, 1, 3, 1, NOW());
+(5, '小程序', 'XCX', 'warning', 3, NULL, 1, 2, 1, NOW());
 
 -- 初始化默认用户和角色关联数据
 INSERT INTO `sys_user_role`
@@ -267,4 +250,4 @@ VALUES
 INSERT INTO `sys_client`
 (`id`, `client_id`, `client_type`, `auth_type`, `active_timeout`, `timeout`, `status`, `create_user`, `create_time`)
 VALUES
-(1, 'ef51c9a3e9046c4f2ea45142c8a8344a', 'PC', '["ACCOUNT", "EMAIL", "PHONE", "SOCIAL"]', 1800, 86400, 1, 1, NOW());
+(1, 'ef51c9a3e9046c4f2ea45142c8a8344a', 'PC', '["ACCOUNT"]', 1800, 86400, 1, 1, NOW());

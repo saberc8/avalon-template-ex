@@ -48,24 +48,24 @@ public class OptionController {
     private final OptionService baseService;
 
     @Operation(summary = "查询参数列表", description = "查询参数列表")
-    @SaCheckPermission(value = {"system:siteConfig:get", "system:securityConfig:get", "system:loginConfig:get"},
-        mode = SaMode.OR)
+    @SaCheckPermission(value = {"system:siteConfig:get", "system:securityConfig:get",
+        "system:loginConfig:get"}, mode = SaMode.OR)
     @GetMapping
     public List<OptionResp> list(@Validated OptionQuery query) {
         return baseService.list(query);
     }
 
     @Operation(summary = "修改参数", description = "修改参数")
-    @SaCheckPermission(value = {"system:siteConfig:update", "system:securityConfig:update", "system:loginConfig:update"},
-        mode = SaMode.OR)
+    @SaCheckPermission(value = {"system:siteConfig:update", "system:securityConfig:update",
+        "system:loginConfig:update"}, mode = SaMode.OR)
     @PutMapping
     public void update(@Valid @RequestBody List<OptionReq> options) {
         baseService.update(options);
     }
 
     @Operation(summary = "重置参数", description = "重置参数")
-    @SaCheckPermission(value = {"system:siteConfig:update", "system:securityConfig:update", "system:loginConfig:update"},
-        mode = SaMode.OR)
+    @SaCheckPermission(value = {"system:siteConfig:update", "system:securityConfig:update",
+        "system:loginConfig:update"}, mode = SaMode.OR)
     @PatchMapping("/value")
     public void resetValue(@Validated @RequestBody OptionResetValueReq req) {
         baseService.resetValue(req);

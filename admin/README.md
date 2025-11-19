@@ -239,7 +239,6 @@ continew-admin-ui
 │  │  ├─ code            # 代码生成模块
 │  │  ├─ common          # 公共模块
 │  │  ├─ monitor         # 系统监控模块
-│  │  ├─ open            # 能力开放模块
 │  │  ├─ schedule        # 任务调度模块
 │  │  └─ system          # 系统管理模块
 │  ├─ assets           # 静态资源
@@ -270,8 +269,6 @@ continew-admin-ui
 │  │  │  │  ├─ login         # 登录日志
 │  │  │  │  └─ operation     # 操作日志
 │  │  │  └─ online           # 在线用户
-│  │  ├─ open            # 能力开放
-│  │  │ └─ user            # 应用管理
 │  │  ├─ setting         # 设置
 │  │  │  ├─ profile        # 个人中心
 │  │  │  └─ message        # 消息中心

@@ -6,27 +6,6 @@ export interface ImageCaptchaResp {
   isEnabled: boolean
 }
 
-/** 仪表盘访问趋势类型 */
-export interface DashboardAccessTrendResp {
-  date: string
-  pvCount: number
-  ipCount: number
-}
-
-/** 仪表盘通用总览类型 */
-export interface DashboardOverviewCommonResp {
-  total: number
-  today: number
-  growth: number
-  dataList: DashboardChartCommonResp[]
-}
-
-/** 仪表盘通用图表类型 */
-export interface DashboardChartCommonResp {
-  name: string
-  value: number
-}
-
 /* 行为验证码类型 */
 export interface BehaviorCaptchaResp {
   originalImageBase64: string

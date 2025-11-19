@@ -5,11 +5,8 @@ databaseChangeLog:
       file: db/changelog/mysql/main_column.sql
   - include:
       file: db/changelog/mysql/main_data.sql
-  - include:
-      file: db/changelog/mysql/plugin/plugin_schedule.sql
-  # 能力开放插件（已移除，如需启用请重新引入）
-  # - include:
-  #     file: db/changelog/mysql/plugin/plugin_open.sql
+  #  - include:
+  #      file: db/changelog/mysql/plugin/plugin_schedule.sql
   #  - include:
   #      file: db/changelog/mysql/plugin/plugin_generator.sql
   # PostgreSQL
@@ -19,9 +16,7 @@ databaseChangeLog:
   #      file: db/changelog/postgresql/main_column.sql
   #  - include:
   #      file: db/changelog/postgresql/main_data.sql
-  #  - include:
-  #      file: db/changelog/postgresql/plugin/plugin_schedule.sql
-  #  - include:
-  #      file: db/changelog/postgresql/plugin/plugin_open.sql
-  #  - include:
-  #      file: db/changelog/postgresql/plugin/plugin_generator.sql
+#  - include:
+#      file: db/changelog/postgresql/plugin/plugin_schedule.sql
+#  - include:
+#      file: db/changelog/postgresql/plugin/plugin_generator.sql

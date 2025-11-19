@@ -165,27 +165,12 @@
 - CRUD ValidateGroup => CrudValidationGroup ([d7ae7b4](https://github.com/continew-org/continew-admin/commit/d7ae7b4e42c424a3db51c72a0ed79572c9fd7601))
 - ValidateGroup => ValidationGroup ([d7ae7b4](https://github.com/continew-org/continew-admin/commit/d7ae7b4e42c424a3db51c72a0ed79572c9fd7601))
 
-### 🐛 问题修复
-
-- 【generator】修复 columnSize 类型错误，兼容无注释字段配置 ([6b64ae3](https://github.com/continew-org/continew-admin/commit/6b64ae3e07a76d844eec4bd05302126cbcaca31b))
-- 补充能力开放模块接口文档配置 ([270fbf1](https://github.com/continew-org/continew-admin/commit/270fbf15af338a6ac3e6a686409eea8e9a32b6bf))
-- 修复文件管理删除文件异常或不成功的情况 ([361a412](https://github.com/continew-org/continew-admin/commit/361a41258e9fdece5ba681298f2839b013d6cfab)) (Gitee#35@kiki1373639299)
-- 修复本地文件管理删除文件异常或不成功的情况 ([c7b58a0](https://github.com/continew-org/continew-admin/commit/c7b58a0fd167c566f6680c87cc455b71c42b8eda)) (Gitee#36@kiki1373639299)
-- 修复 Query 查询数组范围报错 ([d7ae7b4](https://github.com/continew-org/continew-admin/commit/d7ae7b4e42c424a3db51c72a0ed79572c9fd7601))
-
-### 📦 依赖升级
-
-- ContiNew Starter 2.7.4 => 2.7.5 (更多特性及依赖升级详情，请查看 ContiNew Starter [更新日志](https://github.com/continew-org/continew-starter/blob/dev/CHANGELOG.md))
-
-## [v3.4.0](https://github.com/continew-org/continew-admin/compare/v3.3.0...v3.4.0) (2024-11-18)
-
 ### ✨ 新特性
 
 * 新增仪表盘分析接口，查询访问时段分析、查询模块分析、查询终端分析、查询浏览器分析 ([dea8dbe](https://github.com/continew-org/continew-admin/commit/dea8dbe131867a564f7e151a6484db5be6effaa3))
 * 新增查询仪表盘数据总览相关接口, 重构仪表盘相关代码 ([e01df09](https://github.com/continew-org/continew-admin/commit/e01df09127e6efc33971d64e2fe49a2a42282425))
 * 公告支持设置通知范围 ([29202ae](https://github.com/continew-org/continew-admin/commit/29202aea307a7257c9d1e9649dee00140164c59c)) (GitCode#1)
 * 角色管理增加分配角色功能 ([73f880e](https://github.com/continew-org/continew-admin/commit/73f880ec57cfdccfc297aac228410f5bb7fed448)) ([ad3f832](https://github.com/continew-org/continew-admin/commit/ad3f8329dd07858b0982020db3605200112f09b5)) (GitHub#93)
-* 新增能力开放模块应用管理功能 ([f774183](https://github.com/continew-org/continew-admin/commit/f7741832bdd315039cc5f1aa062d8ffac32ddf0f)) ([d1b3824](https://github.com/continew-org/continew-admin/commit/d1b38242b9f291c897a8eb82bd330bd775e656cf)) ([4454daa](https://github.com/continew-org/continew-admin/commit/4454daa9e07af7c7202c386e533ea055bb79f0df)) (Gitee#31)
 * 新增查询用户字典接口 ([d4b02ba](https://github.com/continew-org/continew-admin/commit/d4b02ba9180f82084e5ca844eaa9b4a0966a0164))
 * 代码生成新增菜单SQL模板 ([fb947c9](https://github.com/continew-org/continew-admin/commit/fb947c98fdd075a19c55e1e9e5c137a8482db618)) (GitHub#95)
 

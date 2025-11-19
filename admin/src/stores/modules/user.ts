@@ -4,13 +4,10 @@ import { resetRouter } from '@/router'
 import {
   type AccountLoginReq,
   AuthTypeConstants,
-  type EmailLoginReq,
   type UserInfo,
   accountLogin as accountLoginApi,
-  emailLogin as emailLoginApi,
   getUserInfo as getUserInfoApi,
   logout as logoutApi,
-  socialLogin as socialLoginApi,
 } from '@/apis'
 import { clearToken, getToken, setToken } from '@/utils/auth'
 import { resetHasRouteFlag } from '@/router/guard'
@@ -50,20 +47,6 @@ const storeSetup = () => {
   // 登录
   const accountLogin = async (req: AccountLoginReq) => {
     const res = await accountLoginApi({ ...req, clientId: import.meta.env.VITE_CLIENT_ID, authType: AuthTypeConstants.ACCOUNT })
-    setToken(res.data.token)
-    token.value = res.data.token
-  }
-
-  // 邮箱登录
-  const emailLogin = async (req: EmailLoginReq) => {
-    const res = await emailLoginApi({ ...req, clientId: import.meta.env.VITE_CLIENT_ID, authType: AuthTypeConstants.EMAIL })
-    setToken(res.data.token)
-    token.value = res.data.token
-  }
-
-  // 三方账号登录
-  const socialLogin = async (source: string, req: any) => {
-    const res = await socialLoginApi({ ...req, source, clientId: import.meta.env.VITE_CLIENT_ID, authType: AuthTypeConstants.SOCIAL })
     setToken(res.data.token)
     token.value = res.data.token
   }
@@ -109,8 +92,6 @@ const storeSetup = () => {
     permissions,
     pwdExpiredShow,
     accountLogin,
-    emailLogin,
-    socialLogin,
     logout,
     logoutCallBack,
     getInfo,

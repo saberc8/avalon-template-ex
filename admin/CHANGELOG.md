@@ -176,7 +176,6 @@
 * 公告支持设置通知范围，新增用户选择器组件 ([354b6bc](https://github.com/continew-org/continew-admin-ui/commit/354b6bc6d57c43951db512e9599549d32cdedc9c)) ([5ade6bc](https://github.com/continew-org/continew-admin-ui/commit/5ade6bcecf8c89ebc4260e7292cbbdfc5ac30fec)) ([233bd62](https://github.com/continew-org/continew-admin-ui/commit/233bd62babe6660193835b6bb30ae7d169b032ba)) ([84148b6](https://github.com/continew-org/continew-admin-ui/commit/84148b6a68d0701efc6efb900d1da4d7a6b49bd8)) ([5de731d](https://github.com/continew-org/continew-admin-ui/commit/5de731dab48eb38ca3430a6bcfd807ab36c17a7b)) (GitCode#1)
 * 角色管理增加分配角色功能 ([2f30df5](https://github.com/continew-org/continew-admin-ui/commit/2f30df528caaca664db24ddb80dd4dbb8a378b43)) ([449e512](https://github.com/continew-org/continew-admin-ui/commit/449e5128d74569cd74d0779a17cbcaf1d8390fe6)) (GitHub#33) 
 * 调整默认头像规则，由基于性别的固定头像调整为基于昵称展示（背景颜色基于昵称计算随机） ([00c909e](https://github.com/continew-org/continew-admin-ui/commit/00c909e6f1e1767e69024620e99f71f98f2cf474))
-* 新增能力开放模块应用管理功能 ([26291a1](https://github.com/continew-org/continew-admin-ui/commit/26291a1e444e3d63a5532e25bcaa4ea6a3d17125)) ([2b7c099](https://github.com/continew-org/continew-admin-ui/commit/2b7c09966fc3f8b059c4f587845149f5b1ea14c7)) (Gitee#27)
 * 新增 GiEditTable 编辑表格组件（同步 GiDemo 更新） ([b46235b](https://github.com/continew-org/continew-admin-ui/commit/b46235b7ede5991d3582e68db9ab65515867798e))
 * GiTable 表格组件插槽支持插槽类型提示（同步 GiDemo 更新） ([88864d8](https://github.com/continew-org/continew-admin-ui/commit/88864d8c5df55941a50ef23ac2c3d1030b61b47f))
 * tab栏增加右键菜单 Closes #IA5RD4 ([169a304](https://github.com/continew-org/continew-admin-ui/commit/169a3049c479bd001e5cb5cff4eb20010e3c66ad)) (Gitee#31)
@@ -390,4 +389,3 @@
 - 代码生成：提供根据数据库表自动生成相应的前后端 CRUD 代码的功能
 - 在线用户：管理当前登录用户，可一键踢下线
 - 系统日志：提供登录日志、操作日志管理功能，可查看指定日志的详细请求及响应信息
-

@@ -8,9 +8,6 @@
         <div>
           <PasswordPolicy />
         </div>
-        <div style="margin-top: 16px">
-          <RightBox />
-        </div>
       </a-col>
     </a-row>
   </div>
@@ -18,7 +15,6 @@
 
 <script setup lang="ts">
 import LeftBox from './BasicInfo.vue'
-import RightBox from './Social.vue'
 import PasswordPolicy from './Security.vue'
 
 defineOptions({ name: 'UserProfile' })

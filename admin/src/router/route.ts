@@ -24,18 +24,7 @@ export const systemRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/workplace/index.vue'),
         meta: { title: '工作台', icon: 'desktop', hidden: false, affix: true },
       },
-      {
-        path: '/dashboard/analysis',
-        name: 'Analysis',
-        component: () => import('@/views/dashboard/analysis/index.vue'),
-        meta: { title: '分析页', icon: 'insert-chart', hidden: false },
-      },
     ],
-  },
-  {
-    path: '/social/callback',
-    component: () => import('@/views/login/social/index.vue'),
-    meta: { hidden: true },
   },
   {
     path: '/pwdExpired',
@@ -53,47 +42,6 @@ export const systemRoutes: RouteRecordRaw[] = [
         name: 'UserProfile',
         component: () => import('@/views/user/profile/index.vue'),
         meta: { title: '个人中心', showInTabs: false },
-      },
-    ],
-  },
-  {
-    path: '/about',
-    name: 'About',
-    component: Layout,
-    meta: { title: '关于项目', icon: 'apps', hidden: false, sort: 999 },
-    redirect: '/about/document/api',
-    children: [
-      {
-        path: '/about/document/api',
-        component: () => import('@/views/about/document/api/index.vue'),
-        meta: { title: '接口文档', icon: 'swagger', hidden: false, keepAlive: true },
-      },
-      {
-        path: 'https://continew.top',
-        meta: { title: '在线文档', icon: 'continew', hidden: false },
-      },
-      {
-        path: 'https://arco.design/vue/component/button',
-        meta: { title: 'Arco Design文档', icon: 'arco', hidden: false },
-      },
-      {
-        path: '/about/source',
-        name: 'AboutSource',
-        meta: { title: '开源地址', icon: 'github', hidden: false },
-        children: [
-          {
-            path: 'https://gitee.com/continew/continew-admin',
-            meta: { title: 'Gitee', icon: 'gitee', hidden: false },
-          },
-          {
-            path: 'https://gitcode.com/continew/continew-admin',
-            meta: { title: 'GitCode', icon: 'gitcode', hidden: false },
-          },
-          {
-            path: 'https://github.com/continew-org/continew-admin',
-            meta: { title: 'GitHub', icon: 'github', hidden: false },
-          },
-        ],
       },
     ],
   },

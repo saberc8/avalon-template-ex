@@ -15,10 +15,6 @@
     <name>${project.artifactId}</name>
     <description>插件模块（存放代码生成、任务调度等扩展模块）</description>
 
-    <modules>
-        <module>continew-plugin-schedule</module>
-    </modules>
-
     <dependencies>
         <!-- 公共模块 -->
         <dependency>

@@ -346,18 +346,6 @@ continew-admin
 │  │  │  │  └─ service（代码生成器相关业务接口及实现类）
 │  │  │  └─ test（测试相关代码目录）
 │  │  └─ pom.xml
-│  ├─ continew-plugin-open（能力开放插件模块）
-│  │  ├─ src
-│  │  │  ├─ main/java/top/continew/admin/open
-│  │  │  │  ├─ mapper（代码生成器相关 Mapper）
-│  │  │  │  ├─ model（能力开放相关模型）
-│  │  │  │  │  ├─ entity（能力开放相关实体对象）
-│  │  │  │  │  ├─ query（能力开放相关查询条件）
-│  │  │  │  │  ├─ req（能力开放相关请求对象（Request））
-│  │  │  │  │  └─ resp（能力开放相关响应对象（Response））
-│  │  │  │  └─ service（能力开放相关业务接口及实现类）
-│  │  │  └─ test（测试相关代码目录）
-│  │  └─ pom.xml
 │  ├─ continew-plugin-generator（代码生成器插件模块）
 │  │  ├─ src
 │  │  │  ├─ main
