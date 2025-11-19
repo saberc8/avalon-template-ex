@@ -43,6 +43,9 @@ func AutoMigrate(database *sql.DB) error {
 	if err := ensureSysFile(database); err != nil {
 		return err
 	}
+	if err := ensureSysOption(database); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -580,6 +583,96 @@ SELECT 1145, '删除', 1140, 3, NULL, NULL, NULL, NULL, NULL,
        NULL, NULL, NULL, 'system:dict:item:delete', 5, 1, 1, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1145);
 
+-- 系统配置
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1150, '系统配置', 1000, 2, '/system/config', 'SystemConfig', 'system/config/index', NULL, 'config',
+       FALSE, FALSE, FALSE, NULL, 999, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1150);
+
+-- 网站配置
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1160, '网站配置', 1150, 2, '/system/config?tab=site', 'SystemSiteConfig', 'system/config/site/index', NULL, 'apps',
+       FALSE, FALSE, TRUE, NULL, 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1160);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1161, '查询', 1160, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:siteConfig:get', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1161);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1162, '修改', 1160, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:siteConfig:update', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1162);
+
+-- 安全配置
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1170, '安全配置', 1150, 2, '/system/config?tab=security', 'SystemSecurityConfig', 'system/config/security/index', NULL, 'safe',
+       FALSE, FALSE, TRUE, NULL, 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1170);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1171, '查询', 1170, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:securityConfig:get', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1171);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1172, '修改', 1170, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:securityConfig:update', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1172);
+
+-- 登录配置
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1180, '登录配置', 1150, 2, '/system/config?tab=login', 'SystemLoginConfig', 'system/config/login/index', NULL, 'lock',
+       FALSE, FALSE, TRUE, NULL, 3, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1180);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1181, '查询', 1180, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:loginConfig:get', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1181);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1182, '修改', 1180, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:loginConfig:update', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1182);
+
+-- 存储配置（菜单和按钮先迁移，具体存储配置接口后续再迁）
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1230, '存储配置', 1150, 2, '/system/config?tab=storage', 'SystemStorage', 'system/config/storage/index', NULL, 'storage',
+       FALSE, FALSE, TRUE, NULL, 6, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1230);
+
+-- 客户端配置（同样先迁菜单）
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1250, '客户端配置', 1150, 2, '/system/config?tab=client', 'SystemClient', 'system/config/client/index', NULL, 'mobile',
+       FALSE, FALSE, TRUE, NULL, 7, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1250);
+
 -- 文件管理
 INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
                       is_external, is_cache, is_hidden, permission, sort, status,
@@ -691,6 +784,103 @@ CREATE INDEX IF NOT EXISTS idx_file_create_user ON sys_file (create_user);
 	if _, err := db.Exec(ddl); err != nil {
 		return err
 	}
+	return nil
+}
+
+// ensureSysOption creates sys_option table and seeds default options.
+func ensureSysOption(db *sql.DB) error {
+	const checkTable = `SELECT to_regclass('public.sys_option');`
+	var tableName sql.NullString
+	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
+		return err
+	}
+	if !tableName.Valid {
+		const ddl = `
+CREATE TABLE IF NOT EXISTS sys_option (
+    id            BIGINT       NOT NULL,
+    category      VARCHAR(50)  NOT NULL,
+    name          VARCHAR(50)  NOT NULL,
+    code          VARCHAR(100) NOT NULL,
+    value         TEXT,
+    default_value TEXT,
+    description   VARCHAR(200),
+    update_user   BIGINT,
+    update_time   TIMESTAMP,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_option_category_code ON sys_option (category, code);
+`
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+
+	// Seed a subset of default options from Java main_data.sql.
+	const seed = `
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 1, 'SITE', '系统名称', 'SITE_TITLE', NULL, 'ContiNew Admin', '显示在浏览器标题栏和登录界面的系统名称'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 1);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 2, 'SITE', '系统描述', 'SITE_DESCRIPTION', NULL, '持续迭代优化的前后端分离中后台管理系统框架', '用于 SEO 的网站元描述'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 2);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 3, 'SITE', '版权声明', 'SITE_COPYRIGHT', NULL, 'Copyright © 2022 - present ContiNew Admin 版权所有', '显示在页面底部的版权声明文本'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 3);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 4, 'SITE', '备案号', 'SITE_BEIAN', NULL, NULL, '工信部 ICP 备案编号（如：京ICP备12345678号）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 4);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 5, 'SITE', '系统图标', 'SITE_FAVICON', NULL, '/favicon.ico', '浏览器标签页显示的网站图标（建议 .ico 格式）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 5);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 6, 'SITE', '系统LOGO', 'SITE_LOGO', NULL, '/logo.svg', '显示在登录页面和系统导航栏的网站图标（建议 .svg 格式）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 6);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 10, 'PASSWORD', '密码错误锁定阈值', 'PASSWORD_ERROR_LOCK_COUNT', NULL, '5', '连续登录失败次数达到该值将锁定账号（0-10次，0表示禁用锁定）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 10);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 11, 'PASSWORD', '账号锁定时长（分钟）', 'PASSWORD_ERROR_LOCK_MINUTES', NULL, '5', '账号锁定后自动解锁的时间（1-1440分钟，即24小时）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 11);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 12, 'PASSWORD', '密码有效期（天）', 'PASSWORD_EXPIRATION_DAYS', NULL, '0', '密码强制修改周期（0-999天，0表示永不过期）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 12);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 13, 'PASSWORD', '密码到期提醒（天）', 'PASSWORD_EXPIRATION_WARNING_DAYS', NULL, '0', '密码过期前的提前提醒天数（0表示不提醒）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 13);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 14, 'PASSWORD', '历史密码重复校验次数', 'PASSWORD_REPETITION_TIMES', NULL, '3', '禁止使用最近 N 次的历史密码（3-32次）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 14);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 15, 'PASSWORD', '密码最小长度', 'PASSWORD_MIN_LENGTH', NULL, '8', '密码最小字符长度要求（8-32个字符）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 15);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 16, 'PASSWORD', '是否允许密码包含用户名', 'PASSWORD_ALLOW_CONTAIN_USERNAME', NULL, '1', '是否允许密码包含正序或倒序的用户名字符'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 16);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 17, 'PASSWORD', '密码是否必须包含特殊字符', 'PASSWORD_REQUIRE_SYMBOLS', NULL, '0', '是否要求密码必须包含特殊字符（如：!@#$%）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 17);
+
+INSERT INTO sys_option (id, category, name, code, value, default_value, description)
+SELECT 27, 'LOGIN', '是否启用验证码', 'LOGIN_CAPTCHA_ENABLED', NULL, '1', NULL
+WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 27);
+`
+	if _, err := db.Exec(seed); err != nil {
+		return err
+	}
+
 	return nil
 }
 

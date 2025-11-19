@@ -110,6 +110,10 @@ func main() {
 	dictHandler := httpif.NewDictHandler(pg, tokenSvc)
 	dictHandler.RegisterDictRoutes(r)
 
+	// 系统管理：系统配置（参数管理）
+	optionHandler := httpif.NewOptionHandler(pg, tokenSvc)
+	optionHandler.RegisterOptionRoutes(r)
+
 	// 系统管理：文件管理
 	fileHandler := httpif.NewFileHandler(pg, tokenSvc)
 	fileHandler.RegisterFileRoutes(r)
