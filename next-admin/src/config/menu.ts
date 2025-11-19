@@ -1,3 +1,5 @@
+import type { RouteItem } from "@/types/route";
+
 export type AppMenuItem = {
   label: string;
   path?: string;
@@ -5,9 +7,39 @@ export type AppMenuItem = {
 };
 
 /**
- * 菜单配置（参考 Vue3 版本的 systemRoutes 与常用模块）
+ * 将后端返回的路由树转成侧边菜单数据
+ * 参考 Vue3 版本的动态路由菜单渲染，只保留菜单需要的字段。
  */
-export const menuItems: AppMenuItem[] = [
+export function buildMenuItemsFromRoutes(routes: RouteItem[]): AppMenuItem[] {
+  const walk = (nodes: RouteItem[]): AppMenuItem[] => {
+    return nodes
+      .filter((node) => !node.isHidden)
+      .map<AppMenuItem>((node) => {
+        const children = node.children ? walk(node.children) : [];
+
+        if (children.length > 0) {
+          // 有子节点时作为分组展示，不直接可点击
+          return {
+            label: node.title,
+            children,
+          };
+        }
+
+        // 叶子节点直接使用自身路径
+        return {
+          label: node.title,
+          path: node.path || undefined,
+        };
+      });
+  };
+
+  return walk(routes);
+}
+
+/**
+ * 静态菜单兜底配置（在路由接口异常时使用）
+ */
+export const fallbackMenuItems: AppMenuItem[] = [
   {
     label: "仪表盘",
     children: [
@@ -28,9 +60,7 @@ export const menuItems: AppMenuItem[] = [
   },
   {
     label: "系统监控",
-    children: [
-      { label: "系统日志", path: "/monitor/log" },
-    ],
+    children: [{ label: "系统日志", path: "/monitor/log" }],
   },
   {
     label: "个人中心",

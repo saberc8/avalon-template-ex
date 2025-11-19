@@ -40,6 +40,9 @@ func AutoMigrate(database *sql.DB) error {
 	if err := ensureSysDictItem(database); err != nil {
 		return err
 	}
+	if err := ensureSysFile(database); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -576,12 +579,121 @@ INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirec
 SELECT 1145, '删除', 1140, 3, NULL, NULL, NULL, NULL, NULL,
        NULL, NULL, NULL, 'system:dict:item:delete', 5, 1, 1, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1145);
+
+-- 文件管理
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1110, '文件管理', 1000, 2, '/system/file', 'SystemFile', 'system/file/index', NULL, 'file',
+       FALSE, FALSE, FALSE, NULL, 6, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1110);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1111, '列表', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:list', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1111);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1112, '详情', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:get', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1112);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1113, '上传', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:upload', 3, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1113);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1114, '修改', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:update', 4, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1114);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1115, '删除', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:delete', 5, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1115);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1116, '下载', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:download', 6, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1116);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1117, '创建文件夹', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:createDir', 7, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1117);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1118, '计算文件夹大小', 1110, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:file:calcDirSize', 8, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1118);
 `
 	if _, err := db.Exec(seedMenus); err != nil {
 		return err
 	}
 	return nil
 }
+
+func ensureSysFile(db *sql.DB) error {
+	const checkTable = `SELECT to_regclass('public.sys_file');`
+	var tableName sql.NullString
+	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
+		return err
+	}
+	if tableName.Valid {
+		return nil
+	}
+
+	const ddl = `
+CREATE TABLE IF NOT EXISTS sys_file (
+    id                 BIGINT       NOT NULL,
+    name               VARCHAR(255) NOT NULL,
+    original_name      VARCHAR(255) NOT NULL,
+    size               BIGINT,
+    parent_path        VARCHAR(512) NOT NULL DEFAULT '/',
+    path               VARCHAR(512) NOT NULL,
+    extension          VARCHAR(100),
+    content_type       VARCHAR(255),
+    type               SMALLINT     NOT NULL DEFAULT 1,
+    sha256             VARCHAR(256) NOT NULL,
+    metadata           TEXT,
+    thumbnail_name     VARCHAR(255),
+    thumbnail_size     BIGINT,
+    thumbnail_metadata TEXT,
+    storage_id         BIGINT       NOT NULL,
+    create_user        BIGINT       NOT NULL,
+    create_time        TIMESTAMP    NOT NULL,
+    update_user        BIGINT,
+    update_time        TIMESTAMP,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_file_type       ON sys_file (type);
+CREATE INDEX IF NOT EXISTS idx_file_sha256     ON sys_file (sha256);
+CREATE INDEX IF NOT EXISTS idx_file_storage_id ON sys_file (storage_id);
+CREATE INDEX IF NOT EXISTS idx_file_create_user ON sys_file (create_user);
+`
+	if _, err := db.Exec(ddl); err != nil {
+		return err
+	}
+	return nil
+}
+
 
 func ensureSysRoleMenu(db *sql.DB) error {
 	const checkTable = `SELECT to_regclass('public.sys_role_menu');`

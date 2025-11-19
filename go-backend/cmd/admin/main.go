@@ -110,6 +110,14 @@ func main() {
 	dictHandler := httpif.NewDictHandler(pg, tokenSvc)
 	dictHandler.RegisterDictRoutes(r)
 
+	// 系统管理：文件管理
+	fileHandler := httpif.NewFileHandler(pg, tokenSvc)
+	fileHandler.RegisterFileRoutes(r)
+
+	// 静态文件访问（上传文件）
+	fileRoot := getenvDefault("FILE_STORAGE_DIR", "./data/file")
+	r.Static("/file", fileRoot)
+
 	// 5. 启动 HTTP 服务
 	port := getenvDefault("HTTP_PORT", "4398")
 	if err := r.Run(":" + port); err != nil {

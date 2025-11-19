@@ -1,9 +1,25 @@
 "use client";
 
-import { Box, Flex, Text, Link as ChakraLink, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  Text,
+  Link as ChakraLink,
+  VStack,
+  Center,
+  Spinner,
+  useToast,
+} from "@chakra-ui/react";
 import NextLink from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { menuItems, type AppMenuItem } from "@/config/menu";
+import { get } from "@/utils/api";
+import type { RouteItem } from "@/types/route";
+import {
+  buildMenuItemsFromRoutes,
+  fallbackMenuItems,
+  type AppMenuItem,
+} from "@/config/menu";
 
 function MenuItem({ item }: { item: AppMenuItem }) {
   const pathname = usePathname();
@@ -16,10 +32,11 @@ function MenuItem({ item }: { item: AppMenuItem }) {
         </Text>
         <VStack align="stretch" spacing={1}>
           {item.children.map((child) => {
-            const isActive = child.path && pathname.startsWith(child.path);
+            const isActive =
+              !!child.path && pathname.startsWith(child.path || "");
             return (
               <ChakraLink
-                key={child.path}
+                key={child.path ?? child.label}
                 as={NextLink}
                 href={child.path ?? "#"}
                 px={4}
@@ -39,7 +56,7 @@ function MenuItem({ item }: { item: AppMenuItem }) {
     );
   }
 
-  const isActive = item.path && pathname.startsWith(item.path);
+  const isActive = !!item.path && pathname.startsWith(item.path || "");
 
   return (
     <ChakraLink
@@ -60,6 +77,42 @@ function MenuItem({ item }: { item: AppMenuItem }) {
 }
 
 export function Sidebar() {
+  const [menus, setMenus] = useState<AppMenuItem[]>(fallbackMenuItems);
+  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMenus = async () => {
+      setLoading(true);
+      try {
+        const res = await get<RouteItem[]>("/auth/user/route");
+        if (cancelled) return;
+        const dynamicMenus = buildMenuItemsFromRoutes(res.data);
+        setMenus(dynamicMenus.length ? dynamicMenus : fallbackMenuItems);
+      } catch (error: any) {
+        if (cancelled) return;
+        console.error("加载菜单失败", error);
+        toast({
+          description: error?.message || "加载菜单失败",
+          status: "error",
+        });
+        setMenus(fallbackMenuItems);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadMenus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [toast]);
+
   return (
     <Box
       as="aside"
@@ -82,11 +135,17 @@ export function Sidebar() {
         ContiNew Admin
       </Flex>
       <Box flex="1" overflowY="auto" py={4}>
-        <VStack align="stretch" spacing={1}>
-          {menuItems.map((item) => (
-            <MenuItem key={item.label} item={item} />
-          ))}
-        </VStack>
+        {loading ? (
+          <Center py={4}>
+            <Spinner size="sm" />
+          </Center>
+        ) : (
+          <VStack align="stretch" spacing={1}>
+            {menus.map((item) => (
+              <MenuItem key={item.label} item={item} />
+            ))}
+          </VStack>
+        )}
       </Box>
     </Box>
   );

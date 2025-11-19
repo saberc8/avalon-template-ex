@@ -1,3 +1,5 @@
+import { getToken } from "./auth";
+
 export type ApiResponse<T> = {
   code: number;
   data: T;
@@ -58,5 +60,3 @@ export function post<T, B = unknown>(
     body: JSON.stringify(body),
   });
 }
-import { getToken } from "./auth";
-
