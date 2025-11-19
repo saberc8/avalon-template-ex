@@ -2,6 +2,7 @@ package http
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -140,15 +141,15 @@ ORDER BY d.create_time DESC, d.id DESC;
 	var list []DictResp
 	for rows.Next() {
 		var (
-			id        int64
-			name      string
-			code      string
-			desc      string
-			isSystem  bool
-			createAt  time.Time
-			createBy  string
-			updateAt  sql.NullTime
-			updateBy  string
+			id       int64
+			name     string
+			code     string
+			desc     string
+			isSystem bool
+			createAt time.Time
+			createBy string
+			updateAt sql.NullTime
+			updateBy string
 		)
 		if err := rows.Scan(&id, &name, &code, &desc, &isSystem, &createAt, &createBy, &updateAt, &updateBy); err != nil {
 			Fail(c, "500", "解析字典数据失败")
@@ -204,12 +205,12 @@ LEFT JOIN sys_user AS uu ON uu.id = d.update_user
 WHERE d.id = $1;
 `
 	var (
-		resp      DictResp
-		isSystem  bool
-		createAt  time.Time
-		createBy  string
-		updateAt  sql.NullTime
-		updateBy  string
+		resp     DictResp
+		isSystem bool
+		createAt time.Time
+		createBy string
+		updateAt sql.NullTime
+		updateBy string
 	)
 	err = h.db.QueryRowContext(c.Request.Context(), query, id).
 		Scan(&resp.ID, &resp.Name, &resp.Code, &resp.Description, &isSystem, &createAt, &createBy, &updateAt, &updateBy)
@@ -237,7 +238,6 @@ func (h *DictHandler) CreateDict(c *gin.Context) {
 	if userID == 0 {
 		return
 	}
-
 	var req dictReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, "400", "请求参数不正确")
@@ -247,6 +247,29 @@ func (h *DictHandler) CreateDict(c *gin.Context) {
 	req.Code = strings.TrimSpace(req.Code)
 	if req.Name == "" || req.Code == "" {
 		Fail(c, "400", "名称和编码不能为空")
+		return
+	}
+
+	// Check uniqueness of name and code to match original Java behavior and avoid generic 500.
+	// 名称是否已存在
+	const checkNameSQL = `SELECT 1 FROM sys_dict WHERE name = $1 LIMIT 1;`
+	var tmp int
+	if err := h.db.QueryRowContext(c.Request.Context(), checkNameSQL, req.Name).Scan(&tmp); err != nil && err != sql.ErrNoRows {
+		Fail(c, "500", "新增字典失败")
+		return
+	} else if err == nil {
+		Fail(c, "400", fmt.Sprintf("新增失败，[%s] 已存在", req.Name))
+		return
+	}
+
+	// 编码是否已存在
+	const checkCodeSQL = `SELECT 1 FROM sys_dict WHERE code = $1 LIMIT 1;`
+	tmp = 0
+	if err := h.db.QueryRowContext(c.Request.Context(), checkCodeSQL, req.Code).Scan(&tmp); err != nil && err != sql.ErrNoRows {
+		Fail(c, "500", "新增字典失败")
+		return
+	} else if err == nil {
+		Fail(c, "400", fmt.Sprintf("新增失败，[%s] 已存在", req.Code))
 		return
 	}
 
@@ -357,16 +380,8 @@ func (h *DictHandler) ClearDictCache(c *gin.Context) {
 
 // ListDictItem handles GET /system/dict/item (分页查询字典项)
 func (h *DictHandler) ListDictItem(c *gin.Context) {
-	dictIDStr := c.Query("dictId")
-	if dictIDStr == "" {
-		Fail(c, "400", "字典 ID 不能为空")
-		return
-	}
-	dictID, err := strconv.ParseInt(dictIDStr, 10, 64)
-	if err != nil || dictID <= 0 {
-		Fail(c, "400", "字典 ID 不正确")
-		return
-	}
+	dictIDStr := strings.TrimSpace(c.Query("dictId"))
+
 	page, _ := strconv.Atoi(c.Query("page"))
 	size, _ := strconv.Atoi(c.Query("size"))
 	if page <= 0 {
@@ -381,8 +396,7 @@ func (h *DictHandler) ListDictItem(c *gin.Context) {
 	if statusStr != "" {
 		statusFilter, _ = strconv.ParseInt(statusStr, 10, 64)
 	}
-
-	const query = `
+	const baseQuery = `
 SELECT di.id,
        di.label,
        di.value,
@@ -398,10 +412,30 @@ SELECT di.id,
 FROM sys_dict_item AS di
 LEFT JOIN sys_user AS cu ON cu.id = di.create_user
 LEFT JOIN sys_user AS uu ON uu.id = di.update_user
+`
+	const whereByDictID = `
 WHERE di.dict_id = $1
+`
+	const orderByClause = `
 ORDER BY di.sort ASC, di.id ASC;
 `
-	rows, err := h.db.QueryContext(c.Request.Context(), query, dictID)
+
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	if dictIDStr != "" {
+		dictID, parseErr := strconv.ParseInt(dictIDStr, 10, 64)
+		if parseErr != nil || dictID <= 0 {
+			Fail(c, "400", "字典 ID 不正确")
+			return
+		}
+		rows, err = h.db.QueryContext(c.Request.Context(), baseQuery+whereByDictID+orderByClause, dictID)
+	} else {
+		// 不传 dictId 时，查询所有字典项（与 Java 版接口保持兼容）
+		rows, err = h.db.QueryContext(c.Request.Context(), baseQuery+orderByClause)
+	}
 	if err != nil {
 		Fail(c, "500", "查询字典项失败")
 		return
@@ -411,11 +445,11 @@ ORDER BY di.sort ASC, di.id ASC;
 	var all []DictItemResp
 	for rows.Next() {
 		var (
-			item      DictItemResp
-			createAt  time.Time
-			createBy  string
-			updateAt  sql.NullTime
-			updateBy  string
+			item     DictItemResp
+			createAt time.Time
+			createBy string
+			updateAt sql.NullTime
+			updateBy string
 		)
 		if err := rows.Scan(
 			&item.ID,
@@ -498,11 +532,11 @@ LEFT JOIN sys_user AS uu ON uu.id = di.update_user
 WHERE di.id = $1;
 `
 	var (
-		item      DictItemResp
-		createAt  time.Time
-		createBy  string
-		updateAt  sql.NullTime
-		updateBy  string
+		item     DictItemResp
+		createAt time.Time
+		createBy string
+		updateAt sql.NullTime
+		updateBy string
 	)
 	err = h.db.QueryRowContext(c.Request.Context(), query, idVal).
 		Scan(
