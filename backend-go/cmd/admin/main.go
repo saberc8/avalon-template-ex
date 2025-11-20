@@ -118,6 +118,14 @@ func main() {
 	fileHandler := httpif.NewFileHandler(pg, tokenSvc)
 	fileHandler.RegisterFileRoutes(r)
 
+	// 系统管理：存储配置（需要 RSA 解密存储密钥）
+	storageHandler := httpif.NewStorageHandler(pg, tokenSvc, rsaDecryptor)
+	storageHandler.RegisterStorageRoutes(r)
+
+	// 系统管理：客户端配置
+	clientHandler := httpif.NewClientHandler(pg, tokenSvc)
+	clientHandler.RegisterClientRoutes(r)
+
 	// 静态文件访问（上传文件）
 	fileRoot := getenvDefault("FILE_STORAGE_DIR", "./data/file")
 	r.Static("/file", fileRoot)

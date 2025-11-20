@@ -46,6 +46,12 @@ func AutoMigrate(database *sql.DB) error {
 	if err := ensureSysOption(database); err != nil {
 		return err
 	}
+	if err := ensureSysStorage(database); err != nil {
+		return err
+	}
+	if err := ensureSysClient(database); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -665,6 +671,55 @@ SELECT 1230, '存储配置', 1150, 2, '/system/config?tab=storage', 'SystemStora
        FALSE, FALSE, TRUE, NULL, 6, 1, 1, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1230);
 
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1231, '列表', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:list', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1231);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1232, '详情', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:get', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1232);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1233, '新增', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:create', 3, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1233);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1234, '修改', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:update', 4, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1234);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1235, '删除', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:delete', 5, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1235);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1236, '修改状态', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:updateStatus', 6, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1236);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1237, '设为默认存储', 1230, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:storage:setDefault', 7, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1237);
+
 -- 客户端配置（同样先迁菜单）
 INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
                       is_external, is_cache, is_hidden, permission, sort, status,
@@ -672,6 +727,41 @@ INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirec
 SELECT 1250, '客户端配置', 1150, 2, '/system/config?tab=client', 'SystemClient', 'system/config/client/index', NULL, 'mobile',
        FALSE, FALSE, TRUE, NULL, 7, 1, 1, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1250);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1251, '列表', 1250, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:client:list', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1251);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1252, '详情', 1250, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:client:get', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1252);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1253, '新增', 1250, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:client:create', 3, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1253);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1254, '修改', 1250, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:client:update', 4, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1254);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 1255, '删除', 1250, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'system:client:delete', 5, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1255);
 
 -- 文件管理
 INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
@@ -884,6 +974,130 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_option WHERE id = 27);
 	return nil
 }
 
+// ensureSysStorage 创建 sys_storage 表并写入与 Java 版一致的默认存储配置（简化版）。
+func ensureSysStorage(db *sql.DB) error {
+	const checkTable = `SELECT to_regclass('public.sys_storage');`
+	var tableName sql.NullString
+	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
+		return err
+	}
+	if !tableName.Valid {
+		const ddl = `
+CREATE TABLE IF NOT EXISTS sys_storage (
+    id          BIGINT       NOT NULL,
+    name        VARCHAR(100) NOT NULL,
+    code        VARCHAR(30)  NOT NULL,
+    type        SMALLINT     NOT NULL DEFAULT 1,
+    access_key  VARCHAR(255) DEFAULT NULL,
+    secret_key  VARCHAR(255) DEFAULT NULL,
+    endpoint    VARCHAR(255) DEFAULT NULL,
+    bucket_name VARCHAR(255) NOT NULL,
+    domain      VARCHAR(255) DEFAULT NULL,
+    description VARCHAR(200) DEFAULT NULL,
+    is_default  BOOLEAN      NOT NULL DEFAULT FALSE,
+    sort        INTEGER      NOT NULL DEFAULT 999,
+    status      SMALLINT     NOT NULL DEFAULT 1,
+    create_user BIGINT       NOT NULL,
+    create_time TIMESTAMP    NOT NULL,
+    update_user BIGINT       DEFAULT NULL,
+    update_time TIMESTAMP    DEFAULT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_storage_code  ON sys_storage (code);
+CREATE INDEX IF NOT EXISTS idx_storage_create_user ON sys_storage (create_user);
+CREATE INDEX IF NOT EXISTS idx_storage_update_user ON sys_storage (update_user);
+`
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+
+	// 默认存储：本地存储 + 相对访问路径，便于开发环境直接使用。
+	const seed = `
+INSERT INTO sys_storage (
+    id, name, code, type, access_key, secret_key, endpoint,
+    bucket_name, domain, description, is_default, sort, status,
+    create_user, create_time
+)
+SELECT 1,
+       '开发环境',
+       'local_dev',
+       1,
+       NULL,
+       NULL,
+       NULL,
+       './data/file/',
+       '/file/',
+       '本地存储',
+       TRUE,
+       1,
+       1,
+       1,
+       NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_storage WHERE id = 1);
+`
+	if _, err := db.Exec(seed); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureSysClient 创建 sys_client 表并写入一个默认客户端配置。
+func ensureSysClient(db *sql.DB) error {
+	const checkTable = `SELECT to_regclass('public.sys_client');`
+	var tableName sql.NullString
+	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
+		return err
+	}
+	if !tableName.Valid {
+		const ddl = `
+CREATE TABLE IF NOT EXISTS sys_client (
+    id             BIGINT       NOT NULL,
+    client_id      VARCHAR(50)  NOT NULL,
+    client_type    VARCHAR(50)  NOT NULL,
+    auth_type      JSON         NOT NULL,
+    active_timeout BIGINT       NOT NULL DEFAULT -1,
+    timeout        BIGINT       NOT NULL DEFAULT 2592000,
+    status         SMALLINT     NOT NULL DEFAULT 1,
+    create_user    BIGINT       NOT NULL,
+    create_time    TIMESTAMP    NOT NULL,
+    update_user    BIGINT       DEFAULT NULL,
+    update_time    TIMESTAMP    DEFAULT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_client_client_id  ON sys_client (client_id);
+CREATE INDEX IF NOT EXISTS idx_client_create_user ON sys_client (create_user);
+CREATE INDEX IF NOT EXISTS idx_client_update_user ON sys_client (update_user);
+`
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+
+	// 默认客户端，行为与 Java 版保持一致（PC + ACCOUNT）。
+	const seed = `
+INSERT INTO sys_client (
+    id, client_id, client_type, auth_type,
+    active_timeout, timeout, status,
+    create_user, create_time
+)
+SELECT 1,
+       'ef51c9a3e9046c4f2ea45142c8a8344a',
+       'PC',
+       '["ACCOUNT"]'::json,
+       1800,
+       86400,
+       1,
+       1,
+       NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_client WHERE id = 1);
+`
+	if _, err := db.Exec(seed); err != nil {
+		return err
+	}
+	return nil
+}
+
 
 func ensureSysRoleMenu(db *sql.DB) error {
 	const checkTable = `SELECT to_regclass('public.sys_role_menu');`
@@ -995,11 +1209,10 @@ func ensureSysDict(db *sql.DB) error {
 	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
 		return err
 	}
-	if tableName.Valid {
-		return nil
-	}
 
-	const ddl = `
+	// 如果表不存在则先创建
+	if !tableName.Valid {
+		const ddl = `
 CREATE TABLE IF NOT EXISTS sys_dict (
     id          BIGINT       NOT NULL,
     name        VARCHAR(30)  NOT NULL,
@@ -1016,9 +1229,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_dict_code ON sys_dict (code);
 CREATE INDEX IF NOT EXISTS idx_dict_create_user ON sys_dict (create_user);
 CREATE INDEX IF NOT EXISTS idx_dict_update_user ON sys_dict (update_user);
 `
-	if _, err := db.Exec(ddl); err != nil {
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+
+	// 同步 Java 版 main_data.sql 中的默认字典：
+	// notice_type（公告分类）、client_type（客户端类型）、auth_type_enum（认证类型）、storage_type_enum（存储类型）。
+	const seed = `
+INSERT INTO sys_dict (id, name, code, description, is_system, create_user, create_time)
+SELECT 1, '公告分类', 'notice_type', NULL, TRUE, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict WHERE id = 1 OR code = 'notice_type');
+
+INSERT INTO sys_dict (id, name, code, description, is_system, create_user, create_time)
+SELECT 2, '客户端类型', 'client_type', NULL, TRUE, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict WHERE id = 2 OR code = 'client_type');
+
+INSERT INTO sys_dict (id, name, code, description, is_system, create_user, create_time)
+SELECT 3, '认证类型', 'auth_type_enum', NULL, TRUE, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict WHERE id = 3 OR code = 'auth_type_enum');
+
+INSERT INTO sys_dict (id, name, code, description, is_system, create_user, create_time)
+SELECT 4, '存储类型', 'storage_type_enum', NULL, TRUE, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict WHERE id = 4 OR code = 'storage_type_enum');
+`
+	if _, err := db.Exec(seed); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -1029,11 +1267,10 @@ func ensureSysDictItem(db *sql.DB) error {
 	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
 		return err
 	}
-	if tableName.Valid {
-		return nil
-	}
 
-	const ddl = `
+	// 如果表不存在则先创建
+	if !tableName.Valid {
+		const ddl = `
 CREATE TABLE IF NOT EXISTS sys_dict_item (
     id          BIGINT       NOT NULL,
     label       VARCHAR(30)  NOT NULL,
@@ -1053,8 +1290,112 @@ CREATE INDEX IF NOT EXISTS idx_dict_item_dict_id ON sys_dict_item (dict_id);
 CREATE INDEX IF NOT EXISTS idx_dict_item_create_user ON sys_dict_item (create_user);
 CREATE INDEX IF NOT EXISTS idx_dict_item_update_user ON sys_dict_item (update_user);
 `
-	if _, err := db.Exec(ddl); err != nil {
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+
+	// 初始化默认字典项：
+	// - 公告分类（notice_type，dict_id=1）
+	// - 客户端类型（client_type，dict_id=2）
+	// - 认证类型（auth_type_enum，dict_id=3）
+	// - 存储类型（storage_type_enum，dict_id=4）
+	const seedItems = `
+-- 公告分类
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 1, '产品新闻', '1', 'primary', 1, NULL, 1,
+       1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 1);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 2, '企业动态', '2', 'success', 2, NULL, 1,
+       1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 2);
+
+-- 客户端类型
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 3, '桌面端', 'PC', 'primary', 1, NULL, 1,
+       2, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 3);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 4, '安卓', 'ANDROID', 'success', 2, NULL, 1,
+       2, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 4);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 5, '小程序', 'XCX', 'warning', 3, NULL, 1,
+       2, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 5);
+
+-- 认证类型（来自 AuthTypeEnum）
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 6, '账号', 'ACCOUNT', 'success', 1, NULL, 1,
+       3, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 6);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 7, '邮箱', 'EMAIL', 'primary', 2, NULL, 1,
+       3, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 7);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 8, '手机号', 'PHONE', 'primary', 3, NULL, 1,
+       3, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 8);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 9, '第三方账号', 'SOCIAL', 'error', 4, NULL, 1,
+       3, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 9);
+
+-- 存储类型
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 10, '本地存储', '1', 'primary', 1, NULL, 1,
+       4, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 10);
+
+INSERT INTO sys_dict_item (
+    id, label, value, color, sort, description, status,
+    dict_id, create_user, create_time
+)
+SELECT 11, '对象存储', '2', 'primary', 2, NULL, 1,
+       4, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 11);
+`
+	if _, err := db.Exec(seedItems); err != nil {
 		return err
 	}
+
 	return nil
 }

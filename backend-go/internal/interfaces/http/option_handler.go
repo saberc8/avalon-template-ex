@@ -96,7 +96,7 @@ func (h *OptionHandler) ListOption(c *gin.Context) {
 
 	sqlText := `
 SELECT id, name, code,
-       COALESCE(value, default_value) AS value,
+       COALESCE(value, default_value, '') AS value,
        COALESCE(description, '')
 FROM sys_option
 ` + where + `

@@ -1,12 +1,14 @@
 package http
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,6 +17,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"voc-go-backend/internal/infrastructure/id"
 	"voc-go-backend/internal/infrastructure/security"
@@ -106,16 +110,28 @@ func (h *FileHandler) currentUserID(c *gin.Context) int64 {
 	return claims.UserID
 }
 
-// storageDir returns the local directory used to persist files.
-func storageDir() string {
-	dir := os.Getenv("FILE_STORAGE_DIR")
-	if strings.TrimSpace(dir) == "" {
-		dir = "./data/file"
-	}
-	return dir
+// StorageConfig 表示 sys_storage 中的一条存储配置。
+type StorageConfig struct {
+	ID         int64
+	Name       string
+	Code       string
+	Type       int16
+	AccessKey  string
+	SecretKey  string
+	Endpoint   string
+	BucketName string
+	Domain     string
+	IsDefault  bool
+	Status     int16
 }
 
-// fileBaseURLPrefix returns the URL prefix used for file URLs, e.g. "/file".
+// storageType 常量定义，与 Java StorageTypeEnum 一致：1=LOCAL，2=OSS(MinIO等)。
+const (
+	storageTypeLocal int16 = 1
+	storageTypeOSS   int16 = 2
+)
+
+// fileBaseURLPrefix returns the URL prefix used for local file URLs, e.g. "/file".
 func fileBaseURLPrefix() string {
 	prefix := os.Getenv("FILE_BASE_URL")
 	if strings.TrimSpace(prefix) == "" {
@@ -127,7 +143,8 @@ func fileBaseURLPrefix() string {
 	return strings.TrimRight(prefix, "/")
 }
 
-func buildFileURL(path string) string {
+// buildLocalFileURL 构建本地存储的访问 URL。
+func buildLocalFileURL(path string) string {
 	if path == "" {
 		return ""
 	}
@@ -135,6 +152,248 @@ func buildFileURL(path string) string {
 		path = "/" + path
 	}
 	return fileBaseURLPrefix() + path
+}
+
+// buildStorageFileURL 根据存储配置构建文件访问 URL。
+// - 对象存储：使用 storage.Domain 作为前缀（需配置为 http(s) 开头）。
+// - 本地存储或未配置域名：退回到本地静态路径 /file。
+func buildStorageFileURL(storage *StorageConfig, fullPath string) string {
+	if storage == nil {
+		return buildLocalFileURL(fullPath)
+	}
+	switch storage.Type {
+	case storageTypeOSS:
+		// 对象存储必须配置 Domain，形如 http://minio:9000/bucket/
+		domain := strings.TrimSpace(storage.Domain)
+		if domain == "" {
+			return buildLocalFileURL(fullPath)
+		}
+		// 规范化 Domain，保证无多余斜杠
+		domain = strings.TrimRight(domain, "/")
+		key := strings.TrimPrefix(fullPath, "/")
+		return domain + "/" + key
+	default:
+		return buildLocalFileURL(fullPath)
+	}
+}
+
+// getDefaultStorage 查询默认存储；若未显式指定，则退回到本地存储（使用 ./data/file）。
+func (h *FileHandler) getDefaultStorage(ctx context.Context) (*StorageConfig, error) {
+	const query = `
+SELECT id, name, code, type,
+       COALESCE(access_key, ''),
+       COALESCE(secret_key, ''),
+       COALESCE(endpoint, ''),
+       COALESCE(bucket_name, ''),
+       COALESCE(domain, ''),
+       COALESCE(is_default, FALSE),
+       COALESCE(status, 1)
+FROM sys_storage
+WHERE is_default = TRUE
+LIMIT 1;
+`
+	var cfg StorageConfig
+	err := h.db.QueryRowContext(ctx, query).
+		Scan(
+			&cfg.ID,
+			&cfg.Name,
+			&cfg.Code,
+			&cfg.Type,
+			&cfg.AccessKey,
+			&cfg.SecretKey,
+			&cfg.Endpoint,
+			&cfg.BucketName,
+			&cfg.Domain,
+			&cfg.IsDefault,
+			&cfg.Status,
+		)
+	if err == sql.ErrNoRows {
+		// 没有配置默认存储时，按单一本地存储回退，保持兼容原有逻辑。
+		return &StorageConfig{
+			ID:         1,
+			Name:       "本地存储",
+			Code:       "local",
+			Type:       storageTypeLocal,
+			BucketName: "./data/file",
+			Domain:     "",
+			IsDefault:  true,
+			Status:     1,
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// 如果 BucketName 未配置，本地存储仍然使用默认路径。
+	if cfg.Type == storageTypeLocal && strings.TrimSpace(cfg.BucketName) == "" {
+		cfg.BucketName = "./data/file"
+	}
+	return &cfg, nil
+}
+
+// getStorageByID 根据存储 ID 查询配置。
+func (h *FileHandler) getStorageByID(ctx context.Context, id int64) (*StorageConfig, error) {
+	const query = `
+SELECT id, name, code, type,
+       COALESCE(access_key, ''),
+       COALESCE(secret_key, ''),
+       COALESCE(endpoint, ''),
+       COALESCE(bucket_name, ''),
+       COALESCE(domain, ''),
+       COALESCE(is_default, FALSE),
+       COALESCE(status, 1)
+FROM sys_storage
+WHERE id = $1;
+`
+	var cfg StorageConfig
+	err := h.db.QueryRowContext(ctx, query, id).
+		Scan(
+			&cfg.ID,
+			&cfg.Name,
+			&cfg.Code,
+			&cfg.Type,
+			&cfg.AccessKey,
+			&cfg.SecretKey,
+			&cfg.Endpoint,
+			&cfg.BucketName,
+			&cfg.Domain,
+			&cfg.IsDefault,
+			&cfg.Status,
+		)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Type == storageTypeLocal && strings.TrimSpace(cfg.BucketName) == "" {
+		cfg.BucketName = "./data/file"
+	}
+	return &cfg, nil
+}
+
+// saveToLocal 将文件保存到本地目录，并返回哈希等信息。
+func saveToLocal(header *multipart.FileHeader, bucketPath, parentPath, storedName string) (fullPath, sha string, size int64, contentType string, err error) {
+	parentPath = normalizeParentPath(parentPath)
+
+	// Full logical path stored in DB, e.g. /2025/1/1/123.jpg
+	if parentPath == "/" {
+		fullPath = "/" + storedName
+	} else {
+		fullPath = parentPath + "/" + storedName
+	}
+
+	// Physical path on disk: bucketPath + relative path.
+	if strings.TrimSpace(bucketPath) == "" {
+		bucketPath = "./data/file"
+	}
+	relative := strings.TrimPrefix(fullPath, "/")
+	dstPath := filepath.Join(bucketPath, filepath.FromSlash(relative))
+	if err = os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+		return
+	}
+
+	src, err := header.Open()
+	if err != nil {
+		return
+	}
+	defer src.Close()
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return
+	}
+	defer dst.Close()
+
+	h := sha256.New()
+	w := io.MultiWriter(dst, h)
+	written, err := io.Copy(w, src)
+	if err != nil {
+		return
+	}
+	size = written
+	sha = hex.EncodeToString(h.Sum(nil))
+	contentType = header.Header.Get("Content-Type")
+	return
+}
+
+// saveToMinIO 将文件上传到 MinIO/对象存储，并返回哈希等信息。
+func saveToMinIO(ctx context.Context, header *multipart.FileHeader, storage *StorageConfig, parentPath, storedName string) (fullPath, sha string, size int64, contentType string, err error) {
+	if storage == nil {
+		err = fmt.Errorf("storage config is nil")
+		return
+	}
+	if strings.TrimSpace(storage.Endpoint) == "" || strings.TrimSpace(storage.AccessKey) == "" || strings.TrimSpace(storage.SecretKey) == "" || strings.TrimSpace(storage.BucketName) == "" {
+		err = fmt.Errorf("对象存储配置不完整")
+		return
+	}
+
+	parentPath = normalizeParentPath(parentPath)
+	if parentPath == "/" {
+		fullPath = "/" + storedName
+	} else {
+		fullPath = parentPath + "/" + storedName
+	}
+	objectName := strings.TrimPrefix(fullPath, "/")
+
+	contentType = header.Header.Get("Content-Type")
+	// 先计算 SHA256
+	src, err := header.Open()
+	if err != nil {
+		return
+	}
+	h := sha256.New()
+	written, err := io.Copy(h, src)
+	_ = src.Close()
+	if err != nil {
+		return
+	}
+	size = written
+	sha = hex.EncodeToString(h.Sum(nil))
+
+	// 创建 MinIO 客户端
+	endpoint := storage.Endpoint
+	secure := false
+	if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+		u, parseErr := url.Parse(endpoint)
+		if parseErr != nil {
+			err = parseErr
+			return
+		}
+		secure = u.Scheme == "https"
+		endpoint = u.Host
+	}
+
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(storage.AccessKey, storage.SecretKey, ""),
+		Secure: secure,
+	})
+	if err != nil {
+		return
+	}
+
+	// 确保 Bucket 存在
+	exists, errBucket := client.BucketExists(ctx, storage.BucketName)
+	if errBucket != nil {
+		err = errBucket
+		return
+	}
+	if !exists {
+		if err = client.MakeBucket(ctx, storage.BucketName, minio.MakeBucketOptions{}); err != nil {
+			return
+		}
+	}
+
+	// 实际上传
+	src2, err := header.Open()
+	if err != nil {
+		return
+	}
+	defer src2.Close()
+
+	_, err = client.PutObject(ctx, storage.BucketName, objectName, src2, size, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
+	if err != nil {
+		return
+	}
+	return
 }
 
 // normalizeParentPath ensures parent path is in the form "/xxx/yyy" (no trailing slash).
@@ -176,54 +435,6 @@ func detectFileType(ext, contentType string) int16 {
 	}
 }
 
-func saveUploadedFile(header *multipart.FileHeader, parentPath string) (storedName, fullPath, sha string, size int64, contentType string, err error) {
-	parentPath = normalizeParentPath(parentPath)
-	ext := extensionFromFilename(header.Filename)
-	newID := id.Next()
-	if ext != "" {
-		storedName = fmt.Sprintf("%d.%s", newID, ext)
-	} else {
-		storedName = fmt.Sprintf("%d", newID)
-	}
-
-	// Full logical path stored in DB, e.g. /2025/1/1/123.jpg
-	if parentPath == "/" {
-		fullPath = "/" + storedName
-	} else {
-		fullPath = parentPath + "/" + storedName
-	}
-
-	// Physical path on disk.
-	relative := strings.TrimPrefix(fullPath, "/")
-	dstPath := filepath.Join(storageDir(), filepath.FromSlash(relative))
-	if err = os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
-		return
-	}
-
-	src, err := header.Open()
-	if err != nil {
-		return
-	}
-	defer src.Close()
-
-	dst, err := os.Create(dstPath)
-	if err != nil {
-		return
-	}
-	defer dst.Close()
-
-	h := sha256.New()
-	w := io.MultiWriter(dst, h)
-	written, err := io.Copy(w, src)
-	if err != nil {
-		return
-	}
-	size = written
-	sha = hex.EncodeToString(h.Sum(nil))
-	contentType = header.Header.Get("Content-Type")
-	return
-}
-
 // UploadFile handles POST /system/file/upload and POST /common/file.
 func (h *FileHandler) UploadFile(c *gin.Context) {
 	userID := h.currentUserID(c)
@@ -241,14 +452,41 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		parentPath = "/"
 	}
 
-	storedName, fullPath, sha, size, contentType, err := saveUploadedFile(header, parentPath)
+	ext := extensionFromFilename(header.Filename)
+	newID := id.Next()
+	var storedName string
+	if ext != "" {
+		storedName = fmt.Sprintf("%d.%s", newID, ext)
+	} else {
+		storedName = fmt.Sprintf("%d", newID)
+	}
+
+	// 根据默认存储类型，分别保存到本地或 MinIO。
+	ctx := c.Request.Context()
+	storageCfg, err := h.getDefaultStorage(ctx)
+	if err != nil {
+		Fail(c, "500", "获取存储配置失败")
+		return
+	}
+
+	var (
+		fullPath    string
+		sha         string
+		size        int64
+		contentType string
+	)
+	switch storageCfg.Type {
+	case storageTypeOSS:
+		fullPath, sha, size, contentType, err = saveToMinIO(ctx, header, storageCfg, parentPath, storedName)
+	default:
+		fullPath, sha, size, contentType, err = saveToLocal(header, storageCfg.BucketName, parentPath, storedName)
+	}
 	if err != nil {
 		Fail(c, "500", "保存文件失败")
 		return
 	}
 
 	now := time.Now()
-	ext := extensionFromFilename(header.Filename)
 	fileType := detectFileType(ext, contentType)
 
 	const insertSQL = `
@@ -281,7 +519,7 @@ INSERT INTO sys_file (
 		"",
 		nil,
 		"",
-		int64(1), // single local storage
+		storageCfg.ID,
 		userID,
 		now,
 	)
@@ -290,7 +528,7 @@ INSERT INTO sys_file (
 		return
 	}
 
-	url := buildFileURL(fullPath)
+	url := buildStorageFileURL(storageCfg, fullPath)
 	resp := FileUploadResp{
 		ID:       strconv.FormatInt(fileID, 10),
 		URL:      url,
@@ -433,15 +671,24 @@ LIMIT $%d OFFSET $%d;
 		if updateTimeVal.Valid {
 			item.UpdateTime = formatTime(updateTimeVal.Time)
 		}
-		item.StorageName = "本地存储"
-		item.URL = buildFileURL(item.Path)
+		// 填充存储名称和访问 URL
+		var storageCfg *StorageConfig
+		if item.StorageID > 0 {
+			storageCfg, _ = h.getStorageByID(c.Request.Context(), item.StorageID)
+		}
+		if storageCfg != nil {
+			item.StorageName = storageCfg.Name
+		} else {
+			item.StorageName = "本地存储"
+		}
+		item.URL = buildStorageFileURL(storageCfg, item.Path)
 		if item.ThumbnailName != "" {
 			parent := item.ParentPath
 			if parent == "/" {
 				parent = ""
 			}
 			thumbPath := parent + "/" + item.ThumbnailName
-			item.ThumbnailURL = buildFileURL(thumbPath)
+			item.ThumbnailURL = buildStorageFileURL(storageCfg, thumbPath)
 		} else {
 			item.ThumbnailURL = item.URL
 		}
@@ -705,15 +952,23 @@ LIMIT 1;
 	if updateTimeVal.Valid {
 		item.UpdateTime = formatTime(updateTimeVal.Time)
 	}
-	item.StorageName = "本地存储"
-	item.URL = buildFileURL(item.Path)
+	var storageCfg *StorageConfig
+	if item.StorageID > 0 {
+		storageCfg, _ = h.getStorageByID(c.Request.Context(), item.StorageID)
+	}
+	if storageCfg != nil {
+		item.StorageName = storageCfg.Name
+	} else {
+		item.StorageName = "本地存储"
+	}
+	item.URL = buildStorageFileURL(storageCfg, item.Path)
 	if item.ThumbnailName != "" {
 		parent := item.ParentPath
 		if parent == "/" {
 			parent = ""
 		}
 		thumbPath := parent + "/" + item.ThumbnailName
-		item.ThumbnailURL = buildFileURL(thumbPath)
+		item.ThumbnailURL = buildStorageFileURL(storageCfg, thumbPath)
 	} else {
 		item.ThumbnailURL = item.URL
 	}
@@ -847,14 +1102,47 @@ LIMIT 1;
 		return
 	}
 
-	// Best-effort deletion of physical files.
+	// Best-effort deletion of物理文件（本地）或对象存储文件（MinIO）。
 	for _, f := range toDeleteFiles {
 		if f.path == "" {
 			continue
 		}
-		rel := strings.TrimPrefix(f.path, "/")
-		abs := filepath.Join(storageDir(), filepath.FromSlash(rel))
-		_ = os.Remove(abs)
+		storageCfg, err := h.getStorageByID(c.Request.Context(), f.storageID)
+		if err != nil || storageCfg == nil {
+			continue
+		}
+		switch storageCfg.Type {
+		case storageTypeOSS:
+			// 删除 MinIO 对象
+			endpoint := storageCfg.Endpoint
+			secure := false
+			if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+				u, parseErr := url.Parse(endpoint)
+				if parseErr != nil {
+					continue
+				}
+				secure = u.Scheme == "https"
+				endpoint = u.Host
+			}
+			client, err := minio.New(endpoint, &minio.Options{
+				Creds:  credentials.NewStaticV4(storageCfg.AccessKey, storageCfg.SecretKey, ""),
+				Secure: secure,
+			})
+			if err != nil {
+				continue
+			}
+			objectName := strings.TrimPrefix(f.path, "/")
+			_ = client.RemoveObject(c.Request.Context(), storageCfg.BucketName, objectName, minio.RemoveObjectOptions{})
+		default:
+			// 本地删除
+			rel := strings.TrimPrefix(f.path, "/")
+			bucket := storageCfg.BucketName
+			if strings.TrimSpace(bucket) == "" {
+				bucket = "./data/file"
+			}
+			abs := filepath.Join(bucket, filepath.FromSlash(rel))
+			_ = os.Remove(abs)
+		}
 	}
 
 	OK(c, true)

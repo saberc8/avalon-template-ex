@@ -1,0 +1,154 @@
+// Prisma schema，映射已有的 nv_admin PostgreSQL 数据库。
+// 仅建模当前 Node 版已使用到的表：sys_user、sys_role、sys_user_role、
+// sys_menu、sys_role_menu、sys_dept、sys_dict、sys_dict_item、sys_option。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model sys_user {
+  id             BigInt   @id
+  username       String   @db.VarChar(64)
+  nickname       String   @db.VarChar(30)
+  password       String?  @db.VarChar(255)
+  gender         Int
+  email          String?  @db.VarChar(255)
+  phone          String?  @db.VarChar(255)
+  avatar         String?
+  description    String?  @db.VarChar(200)
+  status         Int
+  is_system      Boolean
+  pwd_reset_time DateTime?
+  dept_id        BigInt
+  create_user    BigInt?
+  create_time    DateTime
+  update_user    BigInt?
+  update_time    DateTime?
+
+  @@map("sys_user")
+}
+
+model sys_role {
+  id                  BigInt  @id
+  name                String  @db.VarChar(30)
+  code                String  @db.VarChar(30)
+  data_scope          Int
+  description         String? @db.VarChar(200)
+  sort                Int
+  is_system           Boolean
+  menu_check_strictly Boolean?
+  dept_check_strictly Boolean?
+  create_user         BigInt
+  create_time         DateTime
+  update_user         BigInt?
+  update_time         DateTime?
+
+  @@map("sys_role")
+}
+
+model sys_user_role {
+  id      BigInt @id
+  user_id BigInt
+  role_id BigInt
+
+  @@map("sys_user_role")
+}
+
+model sys_menu {
+  id          BigInt  @id
+  title       String  @db.VarChar(30)
+  parent_id   BigInt
+  type        Int
+  path        String? @db.VarChar(255)
+  name        String? @db.VarChar(50)
+  component   String? @db.VarChar(255)
+  redirect    String? @db.VarChar(255)
+  icon        String? @db.VarChar(50)
+  is_external Boolean?
+  is_cache    Boolean?
+  is_hidden   Boolean?
+  permission  String? @db.VarChar(100)
+  sort        Int
+  status      Int
+  create_user BigInt
+  create_time DateTime
+  update_user BigInt?
+  update_time DateTime?
+
+  @@map("sys_menu")
+}
+
+model sys_role_menu {
+  role_id BigInt
+  menu_id BigInt
+
+  @@id([role_id, menu_id])
+  @@map("sys_role_menu")
+}
+
+model sys_dept {
+  id          BigInt  @id
+  name        String  @db.VarChar(30)
+  parent_id   BigInt
+  sort        Int
+  status      Int
+  is_system   Boolean
+  description String? @db.VarChar(200)
+  create_user BigInt
+  create_time DateTime
+  update_user BigInt?
+  update_time DateTime?
+
+  @@map("sys_dept")
+}
+
+model sys_dict {
+  id          BigInt  @id
+  name        String  @db.VarChar(30)
+  code        String  @db.VarChar(30)
+  description String? @db.VarChar(200)
+  is_system   Boolean
+  create_user BigInt
+  create_time DateTime
+  update_user BigInt?
+  update_time DateTime?
+
+  @@map("sys_dict")
+}
+
+model sys_dict_item {
+  id          BigInt  @id
+  label       String  @db.VarChar(30)
+  value       String  @db.VarChar(255)
+  color       String? @db.VarChar(30)
+  sort        Int
+  description String? @db.VarChar(200)
+  status      Int
+  dict_id     BigInt
+  create_user BigInt
+  create_time DateTime
+  update_user BigInt?
+  update_time DateTime?
+
+  @@map("sys_dict_item")
+}
+
+model sys_option {
+  id            BigInt  @id
+  category      String  @db.VarChar(50)
+  name          String  @db.VarChar(50)
+  code          String  @db.VarChar(100)
+  value         String?
+  default_value String?
+  description   String? @db.VarChar(200)
+  update_user   BigInt?
+  update_time   DateTime?
+
+  @@map("sys_option")
+}
+

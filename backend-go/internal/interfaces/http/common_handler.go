@@ -50,18 +50,43 @@ func (h *CommonHandler) RegisterCommonRoutes(r *gin.Engine) {
 	r.GET("/common/dict/:code", h.ListDictByCode)
 }
 
-// ListSiteOptions returns basic site configuration dictionary.
-// It mirrors the SITE_* options used by the Java backend.
+// ListSiteOptions 返回基础网站配置字典数据（用于前端初始化站点标题、图标等）。
+// 数据来源于 sys_option 表的 SITE 类别，优先使用当前 value，其次 default_value。
 func (h *CommonHandler) ListSiteOptions(c *gin.Context) {
-	data := []LabelValue{
-		{Label: "SITE_TITLE", Value: "ContiNew Admin"},
-		{Label: "SITE_DESCRIPTION", Value: "持续迭代优化的前后端分离中后台管理系统框架"},
-		{Label: "SITE_COPYRIGHT", Value: "Copyright © 2022 - present ContiNew Admin 版权所有"},
-		{Label: "SITE_BEIAN", Value: ""},
-		{Label: "SITE_FAVICON", Value: "/favicon.ico"},
-		{Label: "SITE_LOGO", Value: "/logo.svg"},
+	const query = `
+SELECT code,
+       COALESCE(value, default_value, '') AS value
+FROM sys_option
+WHERE category = 'SITE'
+ORDER BY id ASC;
+`
+	rows, err := h.db.QueryContext(c.Request.Context(), query)
+	if err != nil {
+		Fail(c, "500", "查询网站配置失败")
+		return
 	}
-	OK(c, data)
+	defer rows.Close()
+
+	var list []LabelValue
+	for rows.Next() {
+		var (
+			code  string
+			value string
+		)
+		if err := rows.Scan(&code, &value); err != nil {
+			Fail(c, "500", "解析网站配置失败")
+			return
+		}
+		list = append(list, LabelValue{
+			Label: code,
+			Value: value,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		Fail(c, "500", "查询网站配置失败")
+		return
+	}
+	OK(c, list)
 }
 
 // ListMenuTree handles GET /common/tree/menu and returns a menu tree
@@ -350,7 +375,8 @@ ORDER BY t1.sort ASC, t1.id ASC;
 	}
 	defer rows.Close()
 
-	var list []LabelValue
+	// 使用非 nil 切片，避免前端拿到 data=null 导致报错
+	list := make([]LabelValue, 0)
 	for rows.Next() {
 		var item LabelValue
 		if err := rows.Scan(&item.Label, &item.Value, &item.Extra); err != nil {
