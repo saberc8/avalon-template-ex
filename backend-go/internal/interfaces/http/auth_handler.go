@@ -1,6 +1,8 @@
 package http
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"voc-go-backend/internal/application/auth"
@@ -22,6 +24,7 @@ func NewAuthHandler(svc *auth.Service, online *OnlineStore) *AuthHandler {
 // RegisterAuthRoutes registers /auth related routes on the given router group.
 func (h *AuthHandler) RegisterAuthRoutes(r *gin.Engine) {
 	r.POST("/auth/login", h.Login)
+	r.POST("/auth/logout", h.Logout)
 }
 
 // Login handles POST /auth/login.
@@ -49,4 +52,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Successful login, return LoginResp as data.
 	c.Header("Content-Type", "application/json; charset=utf-8")
 	OK(c, resp)
+}
+
+// Logout handles POST /auth/logout.
+// 前端仅依赖服务端返回成功，本实现主要用于清理 Go 进程内的在线用户列表。
+func (h *AuthHandler) Logout(c *gin.Context) {
+	authz := c.GetHeader("Authorization")
+	token := strings.TrimSpace(authz)
+	if strings.HasPrefix(strings.ToLower(token), "bearer ") {
+		token = strings.TrimSpace(token[7:])
+	}
+	if token != "" && h.online != nil {
+		h.online.RemoveByToken(token)
+	}
+	OK(c, true)
 }

@@ -36,6 +36,11 @@
   - 在 Go 端接入统一请求日志中间件，将操作日志与登录日志写入 `sys_log`，实现真正的“系统日志完全由 Go 产出”。
   - 为 `/monitor/online`、`/system/log` 接口补充 HTTP 层冒烟测试和导出文件内容校验。
 
+- 补充：认证登出接口迁移
+  - 在 `internal/interfaces/http/auth_handler.go` 中新增 `Logout` 方法和路由：
+    - `POST /auth/logout`：从 `Authorization` 头中提取 token，调用 `OnlineStore.RemoveByToken` 清理当前 Go 进程内的在线用户记录，并返回 `OK(true)`。
+  - 与前端 `pc-admin-vue3/src/apis/auth/index.ts` 中的 `logout()` 保持路径与方法一致，实现与 Java 版 `AuthController.logout` 等价的“退出登录”行为（主要依赖前端清除本地 token，后端登出用于在线用户统计）。
+
 ---
 
 ## 2025-11-20（Codex）— backend-go 系统配置迁移记录
