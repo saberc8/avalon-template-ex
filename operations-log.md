@@ -78,6 +78,35 @@
     - `POST /auth/login`：从 `sys_user` 读取用户信息，使用 RSA+BCrypt 校验密码，返回与 Java/Go 一致的 `token` 字段。
     - `GET /auth/user/info`：根据 JWT 中的 `userId` 查询用户、角色、权限与部门名称，返回与 Java/Go 一致的 `UserInfo` 结构。
     - `GET /auth/user/route`：基于用户角色查询菜单，构建与 Go 版 `BuildRouteTree` 对齐的路由树结构。
+
+---
+
+## 2025-11-20（Codex）— backend-go 系统操作日志中间件接入记录
+
+- 完成内容：
+  - 新增系统日志领域模型与仓储：
+    - 在 `internal/domain/syslog` 下新增 `Record` 实体与 `Repository` 接口，字段对齐 PostgreSQL `sys_log` 表与 Java 版 `LogDO`（包含请求/响应、IP、浏览器、状态、操作人等）。
+    - 在 `internal/infrastructure/persistence/syslog/postgres_repository.go` 中实现基于 PostgreSQL 的 `PgRepository`，使用 `id.Next()` 生成主键，落库时自动补全 `create_time`。
+  - 新增 Gin 系统日志中间件：
+    - 在 `internal/interfaces/http/log_middleware.go` 中实现 `NewSysLogMiddleware`：
+      - 包装 `gin.ResponseWriter` 捕获 HTTP 状态码与响应体内容。
+      - 读取并还原请求体，序列化请求/响应头为 JSON 字符串（便于调试）。
+      - 使用 `ClientIP()` 与 `User-Agent` 填充 `ip/browser` 字段，`address/os` 暂留空以简化实现。
+      - 通过 `TokenService.Parse` 从 `Authorization` 头解析当前用户 ID，写入 `create_user`。
+      - 按路由前缀粗略推断 `module` 与 `description`，覆盖 `/auth/*`、`/system/*`、`/monitor/*` 等常用模块，其余归类为“其它”。
+      - 跳过 `OPTIONS` 预检请求，避免无意义日志，落库失败不影响业务响应。
+  - 在启动入口接入中间件：
+    - 在 `cmd/admin/main.go` 中创建 `sysLogRepo := syslogp.NewPgRepository(pg)`，并通过 `r.Use(httpif.NewSysLogMiddleware(sysLogRepo, tokenSvc))` 全局注册，实现所有业务请求的统一日志采集。
+
+- 已知行为差异与简化：
+  - 当前 Go 端日志中间件未实现 TraceID 与 IP 归属地解析，`trace_id`、`address` 字段暂为空，后续可按需要集成 tracing 与地理位置解析。
+  - 登录接口的 `description` 暂固定为“用户登录”，未像 Java 版那样区分账号登录/邮箱登录/手机号登录的文案细节。
+  - 业务状态目前仅依据 HTTP 状态码判断成功/失败，未深入解析响应体中的 `code/success` 字段，当后端始终返回 200 + 业务错误码时，日志状态可能与前端提示存在轻微差异，后续可按需增强。
+
+- 后续可选优化：
+  - 将日志写入改为异步（缓冲 channel + 后台 goroutine 批量落库），在高 QPS 场景下降低对主请求的影响。
+  - 与 TraceID 方案打通，在响应头中输出并在日志中记录链路 ID，方便链路排查。
+  - 引入 IP 归属地解析与 UA 解析库，为 `address`、`browser`、`os` 字段提供更友好的数据展示。
     - `GET /captcha/image`：返回 `isEnabled=false` 的验证码配置，与 Go 版本逻辑一致。
     - `/common/*` 系列：`/common/dict/option/site`、`/common/tree/menu`、`/common/tree/dept`、`/common/dict/user`、`/common/dict/role`、`/common/dict/{code}`，SQL 与 Go 版保持一致，输出结构满足前端现有调用。
 

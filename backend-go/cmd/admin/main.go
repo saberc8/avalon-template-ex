@@ -12,6 +12,7 @@ import (
 	"voc-go-backend/internal/domain/user"
 	"voc-go-backend/internal/infrastructure/db"
 	rbacp "voc-go-backend/internal/infrastructure/persistence/rbac"
+	syslogp "voc-go-backend/internal/infrastructure/persistence/syslog"
 	persistence "voc-go-backend/internal/infrastructure/persistence/user"
 	"voc-go-backend/internal/infrastructure/security"
 	httpif "voc-go-backend/internal/interfaces/http"
@@ -75,6 +76,10 @@ func main() {
 
 		c.Next()
 	})
+
+	// 系统操作日志中间件：在业务处理前后统一记录 sys_log。
+	sysLogRepo := syslogp.NewPgRepository(pg)
+	r.Use(httpif.NewSysLogMiddleware(sysLogRepo, tokenSvc))
 
 	// 在线用户内存存储（仅当前进程有效）
 	onlineStore := httpif.NewOnlineStore()

@@ -157,3 +157,15 @@
   - 启动 `backend-php`：`composer install && php -S 0.0.0.0:4398 -t public public/index.php`。
   - 使用现有前端管理端分别切换到 PHP 后端，逐项验证 `/system/user`、`/system/role`、`/system/menu`、`/system/dept` 页面功能是否与 Java/Go 行为一致。
 - 由于 Codex 环境缺少 PHP 运行时，本次仅完成静态代码与结构层迁移，未能实际连库与前端联调，需在本地完成最终验证。
+
+---
+
+### 2025-11-20（Codex）backend-go 系统操作日志中间件接入测试记录
+
+- 测试命令：
+  - 在 `backend-go` 目录执行：`go test ./...`
+- 测试结果：
+  - 新增 `internal/domain/syslog`、`internal/infrastructure/persistence/syslog/postgres_repository.go` 与 `internal/interfaces/http/log_middleware.go` 之后，`go test ./...` 仍然全部通过（当前各包无测试用例，仅做编译校验）。
+- 风险评估：
+  - 由于未在本环境中实际启动 Gin 服务并对 `/auth/*`、`/system/*`、`/monitor/*` 接口进行 HTTP 访问，尚未验证中间件在真实请求流水线中的表现。
+  - 日志中间件当前同步写入数据库，在高并发场景下可能增加少量延迟，建议后续按需改造为异步落库并在本地压测环境中评估性能影响。
