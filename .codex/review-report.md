@@ -58,6 +58,76 @@
 
 ---
 
+## 审查报告（backend-go 系统监控 / 在线用户 / 系统日志迁移）
+
+- 日期：2025-11-20
+- 审查者：Codex
+- 任务：在 Go 版后端中补齐 Java 版“系统监控 → 在线用户 / 系统日志”相关菜单与接口，实现与现有 pc-admin-vue3 前端的兼容。
+
+### 评分
+- 技术维度：88/100
+  - 结构对齐：在线用户与系统日志 handler 放置于 `internal/interfaces/http`，风格与现有 User/Role/Menu 等 handler 保持一致，统一使用 `OK` / `Fail` 与 `PageResult` 等响应封装。
+  - 数据模型：`OnlineUserResp`、`LogResp`、`LogDetailResp` 的字段命名与前端 TypeScript 类型以及 Java 版响应模型对齐，避免了前端适配层的额外改动。
+  - SQL 与性能：系统日志分页查询采用数据库层统计 + 分页查询，避免一次性加载所有日志；筛选条件与 Java 版 `LogServiceImpl.buildQueryWrapper` 对应字段基本一致。
+- 战略维度：86/100
+  - 需求匹配：前端“系统监控”下的“在线用户”“系统日志”页面所依赖的菜单、权限码与接口路径均已在 Go 端提供，可支持从 Java 后端切换到 Go 后端时保持页面可用。
+  - 风险评估：在线用户当前仅在单进程内维护内存会话，系统日志依赖现有 `sys_log` 表数据且未接入 Go 端日志写入链路，因此在高可用与一致性层面存在可预见的改进空间。
+- 综合评分：87/100
+
+### 审查结论
+- 建议：需改进
+  - 当前实现已满足“前端可用 + 行为接近 Java 版”的目标，适合作为迁移过渡版本。
+  - 如需在生产环境完全替代 Java 版监控模块，建议后续引入持久化在线会话管理与统一的操作日志写入中间件。
+
+### 关键检查点
+- 菜单与权限：
+  - `ensureSysMenu` 中新增：
+    - `系统监控` 顶级目录（ID=2000，路径 `/monitor`，组件 `Layout`）。
+    - `在线用户` 菜单（ID=2010，路径 `/monitor/online`，权限码 `monitor:online:list` / `monitor:online:kickout`）。
+    - `系统日志` 菜单（ID=2030，路径 `/monitor/log`，权限码 `monitor:log:list` / `monitor:log:get` / `monitor:log:export`）。
+  - 使用 `WHERE NOT EXISTS` 防止与已有 Java 初始化数据冲突，新库场景下可直接获得完整监控菜单。
+- 在线用户：
+  - 设计：
+    - `OnlineStore` 在内存中维护在线会话（用户 ID、用户名、昵称、token、IP、User-Agent、登录时间、最后活跃时间）。
+    - 登录成功后由 `AuthHandler.Login` 调用 `RecordLogin` 记录会话；`OnlineUserHandler` 提供列表与强退接口。
+  - 行为：
+    - `GET /monitor/online`：支持按昵称与登录时间范围过滤，返回 `PageResult<OnlineUserResp>`，字段结构与前端类型一致。
+    - `DELETE /monitor/online/{token}`：解析当前请求头中的 Authorization，禁止对当前 token 执行强退，成功时从内存存储移除对应会话。
+  - 限制：
+    - 在线状态仅对当前 Go 进程有效，未实现分布式同步与持久化；强退不会改变 JWT 本身的有效性，仅影响监控列表展示。
+- 系统日志：
+  - 设计：
+    - `LogHandler` 直接基于 `sys_log` 与 `sys_user` 联表查询，支持对描述、模块、IP/地址、操作人、状态、时间范围的组合筛选。
+    - 使用数据库分页（COUNT + LIMIT/OFFSET），避免在日志量较大时的内存压力。
+  - 行为：
+    - `GET /system/log`：返回分页列表，字段与前端 `LogResp` 对齐。
+    - `GET /system/log/{id}`：返回单条详情，包含 TraceID、请求/响应头体等完整信息，对应前端详情抽屉展示。
+    - `GET /system/log/export/login` / `export/operation`：按筛选条件导出 CSV 文件，列头与 Java 版 Excel 导出文件保持一致（登录日志与操作日志分别对应不同列顺序与名称）。
+  - 限制：
+    - 当前未在 Go 端接入统一操作日志写入链路，`sys_log` 中的数据仍依赖历史 Java 应用或其他组件写入，新接入系统的日志需要后续优化方案支持。
+
+### 风险与遗留项
+- 在线用户：
+  - 仅在单进程内维护在线状态，对多实例部署与服务重启不友好。
+  - 未实现 token 黑名单或会话失效机制，强退对业务接口访问不会产生直接限制。
+- 系统日志：
+  - 未验证在大数据量（百万级以上日志）场景下的性能表现，后续可考虑增加时间分区或更细粒度的索引。
+  - 导出的 CSV 当前采用简单转义规则，对于包含复杂换行或逗号的字段可能仍需进一步增强转义逻辑。
+
+### 留痕文件
+- 代码：
+  - `backend-go/internal/infrastructure/db/migrate.go`
+  - `backend-go/internal/interfaces/http/online_handler.go`
+  - `backend-go/internal/interfaces/http/log_handler.go`
+  - `backend-go/internal/interfaces/http/auth_handler.go`
+  - `backend-go/cmd/admin/main.go`
+- 文档与日志：
+  - `operations-log.md`
+  - `.codex/testing.md`
+  - `.codex/review-report.md`（本文件）
+
+---
+
 ## 审查报告（backend-python FastAPI 基础迁移）
 
 - 日期：2025-11-20

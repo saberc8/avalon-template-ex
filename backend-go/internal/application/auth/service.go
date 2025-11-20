@@ -78,6 +78,10 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if err != nil {
 		return nil, err
 	}
-	return &LoginResponse{Token: token}, nil
+	return &LoginResponse{
+		Token:    token,
+		UserID:   user.ID,
+		Username: user.Username,
+		Nickname: user.Nickname,
+	}, nil
 }
-

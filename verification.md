@@ -3,13 +3,19 @@
 ### 已验证内容
 - Go 项目编译与基础单元测试入口：
   - 在 `backend-go` 目录执行 `go test ./...`，所有包均成功编译，当前无实际测试用例。
-- 静态代码级联通性检查：
+- 静态代码级联通性检查（系统配置）：
   - `cmd/admin/main.go` 中已注册：
     - `/system/storage*` 路由（StorageHandler）
     - `/system/client*` 路由（ClientHandler）
     - `/common/dict/option/site` 仍由 CommonHandler 提供，但实现改为基于 `sys_option`。
   - 迁移函数 `AutoMigrate` 已按顺序调用：
     - `ensureSysOption` → `ensureSysStorage` → `ensureSysClient`，保证配置表在服务启动时自动创建与补种默认数据。
+- 新增静态检查（系统监控 / 在线用户 / 系统日志）：
+  - `cmd/admin/main.go` 中已注册：
+    - `/monitor/online`、`/monitor/online/{token}` 路由（OnlineUserHandler）。
+    - `/system/log`、`/system/log/{id}`、`/system/log/export/login`、`/system/log/export/operation` 路由（LogHandler）。
+  - `AutoMigrate` 中 `ensureSysMenu` 已补充系统监控相关菜单种子数据（ID：2000、2010、2011、2012、2030、2031、2032、2033），确保前端菜单加载与权限控制可用。
+  - 前端 `pc-admin-vue3` 中监控相关类型定义与后端响应结构已对齐（特别是 `OnlineUserResp` 字段）。
 
 ### 未能在本地直接验证的项
 - 实际 HTTP 调用与前端联调：
@@ -30,7 +36,16 @@
    - 客户端配置：
      - `GET /system/client?page=1&size=10`：确认返回默认 PC 客户端。
      - 在前端新增客户端，检查多选认证类型展示与详情抽屉内容是否正确。
+   - 在线用户：
+     - 登录后台后访问“系统监控 → 在线用户”页面，确认列表中出现当前登录用户（昵称 + 用户名 + 登录时间）。
+     - 使用昵称和时间范围筛选，观察 `/monitor/online` 请求参数与返回数据是否符合预期。
+     - 尝试对非当前会话执行“强退”，确认请求 `DELETE /monitor/online/{token}` 返回成功并刷新列表；对当前 token 强退应提示“不能强退自己”且不会下线当前用户。
+   - 系统日志：
+     - 访问“系统监控 → 系统日志”页面，切换“登录日志”和“操作日志” Tab，验证 `GET /system/log` 返回的数据字段与表格展示一致。
+     - 点击操作日志记录的时间链接，触发 `GET /system/log/{id}`，检查详情抽屉中的 TraceID、请求/响应头体等是否正确展示。
+     - 点击“导出”按钮，验证 `GET /system/log/export/login` 与 `/system/log/export/operation` 返回的 CSV 文件可正常下载并打开，列头与 Java 版一致。
 
 ### 风险评估
-- 现阶段改动主要集中在配置与 CRUD 层，未引入复杂业务逻辑或跨模块副作用，风险可控。
-- 建议在接入正式环境前，与前端一起完成一次完整的系统配置回归（五个配置页逐一操作、刷新与重登录验证）。+
+- 现阶段改动主要集中在配置、监控与 CRUD 层，未引入复杂跨模块副作用，风险可控。
+- 在线用户功能目前基于内存存储，服务重启后在线列表会清空，且“强退”不会立即使 JWT 无效，建议在生产环境前视需求补充持久化与黑名单校验。
+- 建议在接入正式环境前，与前端一起完成一次完整的系统配置与系统监控回归（配置页与监控页逐一操作、刷新与重登录验证）。

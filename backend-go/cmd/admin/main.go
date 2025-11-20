@@ -76,6 +76,9 @@ func main() {
 		c.Next()
 	})
 
+	// 在线用户内存存储（仅当前进程有效）
+	onlineStore := httpif.NewOnlineStore()
+
 	// 公共接口
 	commonHandler := httpif.NewCommonHandler(pg)
 	commonHandler.RegisterCommonRoutes(r)
@@ -85,10 +88,14 @@ func main() {
 	captchaHandler.RegisterCaptchaRoutes(r)
 
 	// 登录与用户接口
-	authHandler := httpif.NewAuthHandler(authSvc)
+	authHandler := httpif.NewAuthHandler(authSvc, onlineStore)
 	authHandler.RegisterAuthRoutes(r)
 	userHandler := httpif.NewUserHandler(userRepo, roleRepo, menuRepo, tokenSvc)
 	userHandler.RegisterUserRoutes(r)
+
+	// 系统监控：在线用户
+	onlineUserHandler := httpif.NewOnlineUserHandler(onlineStore, tokenSvc)
+	onlineUserHandler.RegisterOnlineUserRoutes(r)
 
 	// 系统管理：菜单管理
 	menuHandler := httpif.NewMenuHandler(pg, tokenSvc)
@@ -125,6 +132,10 @@ func main() {
 	// 系统管理：客户端配置
 	clientHandler := httpif.NewClientHandler(pg, tokenSvc)
 	clientHandler.RegisterClientRoutes(r)
+
+	// 系统监控：系统日志
+	logHandler := httpif.NewLogHandler(pg)
+	logHandler.RegisterLogRoutes(r)
 
 	// 静态文件访问（上传文件）
 	fileRoot := getenvDefault("FILE_STORAGE_DIR", "./data/file")

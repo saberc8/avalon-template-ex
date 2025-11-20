@@ -37,6 +37,7 @@ const { storage_type_enum } = useDict('storage_type_enum')
 
 const [form, resetForm] = useResetReactive({
   type: 2,
+  region: '',
   isDefault: false,
   sort: 999,
   status: 2,
@@ -86,6 +87,14 @@ const columns: ColumnItem[] = reactive([
     type: 'input',
     span: 24,
     required: true,
+    show: () => form.type === 2,
+  },
+  {
+    label: 'Region',
+    field: 'region',
+    type: 'input',
+    span: 24,
+    required: false,
     show: () => form.type === 2,
   },
   {

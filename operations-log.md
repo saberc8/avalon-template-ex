@@ -1,3 +1,43 @@
+## 2025-11-20（Codex）— backend-go 系统监控 / 在线用户 / 系统日志迁移记录
+
+- 完成内容：
+  - 菜单与权限：
+    - 在 `internal/infrastructure/db/migrate.go` 的 `ensureSysMenu` 中补充系统监控相关菜单与按钮种子数据：
+      - 顶级菜单：`系统监控`（ID=2000，路径 `/monitor`，组件 `Layout`）。
+      - 子菜单：`在线用户`（ID=2010，路径 `/monitor/online`，组件 `monitor/online/index`），按钮权限 `monitor:online:list`、`monitor:online:kickout`。
+      - 子菜单：`系统日志`（ID=2030，路径 `/monitor/log`，组件 `monitor/log/index`），按钮权限 `monitor:log:list`、`monitor:log:get`、`monitor:log:export`。
+  - 在线用户功能：
+    - 新增 `internal/interfaces/http/online_handler.go`，实现 `/monitor/online` 与 `/monitor/online/{token}`：
+      - 使用 `OnlineStore` 在内存中维护在线会话（用户 ID、昵称、token、IP、UA、登录时间、最后活跃时间），结构与前端 `OnlineUserResp` 对齐。
+      - `GET /monitor/online` 支持按昵称与登录时间范围筛选，并返回 `PageResult<OnlineUserResp>`。
+      - `DELETE /monitor/online/{token}` 校验当前请求 token，禁止“强退自己”，从内存中移除目标会话并返回成功。
+    - 调整 `internal/application/auth/model.go` / `service.go`，在 `LoginResponse` 中附带 `userId/username/nickname`，便于登录成功后记录在线用户。
+    - 调整 `internal/interfaces/http/auth_handler.go`，在登录成功后调用 `OnlineStore.RecordLogin` 记录当前会话。
+    - 在 `cmd/admin/main.go` 中创建单例 `OnlineStore`，并通过 `NewAuthHandler` / `NewOnlineUserHandler` 注入，注册 `/monitor/online*` 路由。
+    - 更新前端类型 `pc-admin-vue3/src/apis/monitor/type.ts` 的 `OnlineUserResp` 字段定义，改为与 Java 版 `OnlineUserResp` 一致（包含 `token/username/nickname/clientType/clientId/loginTime/lastActiveTime` 等）。
+  - 系统日志功能：
+    - 新增 `internal/interfaces/http/log_handler.go`，实现 `/system/log` 相关接口：
+      - `GET /system/log`：基于 `sys_log` + `sys_user` 联表，支持按描述、模块、IP/地址、操作人、状态、时间范围筛选，返回分页列表，字段与前端 `LogResp` 对齐。
+      - `GET /system/log/{id}`：返回单条日志详情，包含 TraceID、请求/响应头体等，字段与前端 `LogDetailResp` 对齐。
+      - `GET /system/log/export/login` / `export/operation`：按筛选条件导出登录日志 / 操作日志为 CSV 文件（UTF-8），列名与 Java 版 Excel 导出保持一致。
+    - 在 `cmd/admin/main.go` 中注册 `LogHandler` 路由。
+
+- 已知行为差异与简化：
+  - 在线用户：
+    - 当前在线状态仅在单个 Go 进程内通过内存维护，服务重启后会清空在线列表；未与数据库或外部缓存（如 Redis）做持久化，同一用户多终端登录仍可正确展示多条会话。
+    - `DELETE /monitor/online/{token}` 仅从内存列表中移除会话，不会使该 JWT token 立即失效；若需做到“强退即立即失效”，后续需要在 `TokenService` 或统一中间件中增加黑名单校验。
+    - 未实现 IP 归属地解析，`address` 字段暂返回空字符串；`browser` 直接使用原始 User-Agent 字符串，`os` 暂留空。
+  - 系统日志：
+    - 当前 Go 端仅提供 `sys_log` 的查询与导出能力，本次没有接入全局 AOP 日志拦截器；日志表需由原 Java 版本或其他手段写入。
+    - 导出的 CSV 使用简单逗号分隔并对逗号/引号做基础转义，未使用 Excel 专用库，但前端下载与打开行为与 Java 版类似。
+
+- 后续可选优化：
+  - 为在线用户增加定期清理和主动心跳更新逻辑（例如在通用鉴权中间件中根据 token 刷新 `LastActiveTime`），并引入持久化存储（如 `sys_online_user` 或缓存）。
+  - 在 Go 端接入统一请求日志中间件，将操作日志与登录日志写入 `sys_log`，实现真正的“系统日志完全由 Go 产出”。
+  - 为 `/monitor/online`、`/system/log` 接口补充 HTTP 层冒烟测试和导出文件内容校验。
+
+---
+
 ## 2025-11-20（Codex）— backend-go 系统配置迁移记录
 
 - 完成内容：

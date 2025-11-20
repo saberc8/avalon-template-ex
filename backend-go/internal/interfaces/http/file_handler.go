@@ -121,6 +121,7 @@ type StorageConfig struct {
 	Endpoint   string
 	BucketName string
 	Domain     string
+	Region     string
 	IsDefault  bool
 	Status     int16
 }
@@ -186,6 +187,7 @@ SELECT id, name, code, type,
        COALESCE(endpoint, ''),
        COALESCE(bucket_name, ''),
        COALESCE(domain, ''),
+       COALESCE(region, ''),
        COALESCE(is_default, FALSE),
        COALESCE(status, 1)
 FROM sys_storage
@@ -204,6 +206,7 @@ LIMIT 1;
 			&cfg.Endpoint,
 			&cfg.BucketName,
 			&cfg.Domain,
+			&cfg.Region,
 			&cfg.IsDefault,
 			&cfg.Status,
 		)
@@ -239,6 +242,7 @@ SELECT id, name, code, type,
        COALESCE(endpoint, ''),
        COALESCE(bucket_name, ''),
        COALESCE(domain, ''),
+       COALESCE(region, ''),
        COALESCE(is_default, FALSE),
        COALESCE(status, 1)
 FROM sys_storage
@@ -256,6 +260,7 @@ WHERE id = $1;
 			&cfg.Endpoint,
 			&cfg.BucketName,
 			&cfg.Domain,
+			&cfg.Region,
 			&cfg.IsDefault,
 			&cfg.Status,
 		)
@@ -363,6 +368,8 @@ func saveToMinIO(ctx context.Context, header *multipart.FileHeader, storage *Sto
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(storage.AccessKey, storage.SecretKey, ""),
 		Secure: secure,
+		// Region 用于兼容 S3 协议的对象存储（如七牛等），默认留空即可。
+		Region: strings.TrimSpace(storage.Region),
 	})
 	if err != nil {
 		return
@@ -375,7 +382,10 @@ func saveToMinIO(ctx context.Context, header *multipart.FileHeader, storage *Sto
 		return
 	}
 	if !exists {
-		if err = client.MakeBucket(ctx, storage.BucketName, minio.MakeBucketOptions{}); err != nil {
+		if err = client.MakeBucket(ctx, storage.BucketName, minio.MakeBucketOptions{
+			// 七牛等服务端创建 Bucket 时需要带上 Region，这里复用存储配置中的 Region。
+			Region: strings.TrimSpace(storage.Region),
+		}); err != nil {
 			return
 		}
 	}

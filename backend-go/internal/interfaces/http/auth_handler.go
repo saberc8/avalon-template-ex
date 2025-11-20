@@ -8,11 +8,15 @@ import (
 
 // AuthHandler exposes authentication HTTP endpoints.
 type AuthHandler struct {
-	svc *auth.Service
+	svc    *auth.Service
+	online *OnlineStore
 }
 
-func NewAuthHandler(svc *auth.Service) *AuthHandler {
-	return &AuthHandler{svc: svc}
+func NewAuthHandler(svc *auth.Service, online *OnlineStore) *AuthHandler {
+	return &AuthHandler{
+		svc:    svc,
+		online: online,
+	}
 }
 
 // RegisterAuthRoutes registers /auth related routes on the given router group.
@@ -35,6 +39,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		// with the message coming from the service (already localized).
 		Fail(c, "400", err.Error())
 		return
+	}
+
+	// 登录成功后记录在线用户信息（仅在当前 Go 进程内维护内存状态）。
+	if h.online != nil && resp != nil {
+		h.online.RecordLogin(c, resp.UserID, resp.Username, resp.Nickname, req.ClientID, resp.Token)
 	}
 
 	// Successful login, return LoginResp as data.

@@ -22,6 +22,7 @@ type StorageResp struct {
 	AccessKey        string `json:"accessKey"`
 	SecretKey        string `json:"secretKey"`
 	Endpoint         string `json:"endpoint"`
+	Region           string `json:"region"`
 	BucketName       string `json:"bucketName"`
 	Domain           string `json:"domain"`
 	Description      string `json:"description"`
@@ -42,6 +43,7 @@ type storageReq struct {
 	AccessKey   string  `json:"accessKey"`
 	SecretKey   *string `json:"secretKey"`
 	Endpoint    string  `json:"endpoint"`
+	Region      string  `json:"region"`
 	BucketName  string  `json:"bucketName"`
 	Domain      string  `json:"domain"`
 	Description string  `json:"description"`
@@ -140,6 +142,7 @@ SELECT s.id,
        s.code,
        s.type,
        COALESCE(s.access_key, ''),
+       COALESCE(s.region, ''),
        COALESCE(s.endpoint, ''),
        s.bucket_name,
        COALESCE(s.domain, ''),
@@ -179,6 +182,7 @@ ORDER BY s.sort ASC, s.id ASC;
 			&item.Code,
 			&item.Type,
 			&item.AccessKey,
+			&item.Region,
 			&item.Endpoint,
 			&item.BucketName,
 			&item.Domain,
@@ -226,6 +230,7 @@ SELECT s.id,
        COALESCE(s.access_key, ''),
        COALESCE(s.secret_key, ''),
        COALESCE(s.endpoint, ''),
+       COALESCE(s.region, ''),
        s.bucket_name,
        COALESCE(s.domain, ''),
        COALESCE(s.description, ''),
@@ -256,6 +261,7 @@ WHERE s.id = $1;
 			&resp.AccessKey,
 			&resp.SecretKey,
 			&resp.Endpoint,
+			&resp.Region,
 			&resp.BucketName,
 			&resp.Domain,
 			&resp.Description,
@@ -302,6 +308,7 @@ func (h *StorageHandler) CreateStorage(c *gin.Context) {
 	req.BucketName = strings.TrimSpace(req.BucketName)
 	req.Domain = strings.TrimSpace(req.Domain)
 	req.Endpoint = strings.TrimSpace(req.Endpoint)
+	req.Region = strings.TrimSpace(req.Region)
 
 	if req.Name == "" || req.Code == "" {
 		Fail(c, "400", "名称和编码不能为空")
@@ -345,12 +352,14 @@ func (h *StorageHandler) CreateStorage(c *gin.Context) {
 	const stmt = `
 INSERT INTO sys_storage (
     id, name, code, type, access_key, secret_key, endpoint,
+    region,
     bucket_name, domain, description, is_default, sort, status,
     create_user, create_time
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7,
-    $8, $9, $10, $11, $12, $13,
-    $14, $15
+    $8,
+    $9, $10, $11, $12, $13, $14,
+    $15, $16
 );
 `
 	isDefault := false
@@ -368,6 +377,7 @@ INSERT INTO sys_storage (
 		req.AccessKey,
 		secretVal,
 		req.Endpoint,
+		req.Region,
 		req.BucketName,
 		req.Domain,
 		req.Description,
@@ -404,6 +414,7 @@ func (h *StorageHandler) UpdateStorage(c *gin.Context) {
 	req.BucketName = strings.TrimSpace(req.BucketName)
 	req.Domain = strings.TrimSpace(req.Domain)
 	req.Endpoint = strings.TrimSpace(req.Endpoint)
+	req.Region = strings.TrimSpace(req.Region)
 
 	if req.Name == "" {
 		Fail(c, "400", "名称不能为空")
@@ -448,14 +459,15 @@ UPDATE sys_storage
        access_key = $3,
        secret_key = $4,
        endpoint = $5,
-       bucket_name = $6,
-       domain = $7,
-       description = $8,
-       sort = $9,
-       status = $10,
-       update_user = $11,
-       update_time = $12
- WHERE id = $13;
+       region = $6,
+       bucket_name = $7,
+       domain = $8,
+       description = $9,
+       sort = $10,
+       status = $11,
+       update_user = $12,
+       update_time = $13
+ WHERE id = $14;
 `
 		if _, err := h.db.ExecContext(
 			c.Request.Context(),
@@ -465,6 +477,7 @@ UPDATE sys_storage
 			req.AccessKey,
 			secretVal,
 			req.Endpoint,
+			req.Region,
 			req.BucketName,
 			req.Domain,
 			req.Description,
@@ -484,14 +497,15 @@ UPDATE sys_storage
        type = $2,
        access_key = $3,
        endpoint = $4,
-       bucket_name = $5,
-       domain = $6,
-       description = $7,
-       sort = $8,
-       status = $9,
-       update_user = $10,
-       update_time = $11
- WHERE id = $12;
+       region = $5,
+       bucket_name = $6,
+       domain = $7,
+       description = $8,
+       sort = $9,
+       status = $10,
+       update_user = $11,
+       update_time = $12
+ WHERE id = $13;
 `
 		if _, err := h.db.ExecContext(
 			c.Request.Context(),
@@ -500,6 +514,7 @@ UPDATE sys_storage
 			req.Type,
 			req.AccessKey,
 			req.Endpoint,
+			req.Region,
 			req.BucketName,
 			req.Domain,
 			req.Description,

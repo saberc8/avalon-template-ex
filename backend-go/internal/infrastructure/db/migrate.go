@@ -40,6 +40,9 @@ func AutoMigrate(database *sql.DB) error {
 	if err := ensureSysDictItem(database); err != nil {
 		return err
 	}
+	if err := ensureSysLog(database); err != nil {
+		return err
+	}
 	if err := ensureSysFile(database); err != nil {
 		return err
 	}
@@ -826,6 +829,65 @@ INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirec
 SELECT 1118, '计算文件夹大小', 1110, 3, NULL, NULL, NULL, NULL, NULL,
        NULL, NULL, NULL, 'system:file:calcDirSize', 8, 1, 1, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 1118);
+
+-- 系统监控（参考 Java main_data.sql）
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2000, '系统监控', 0, 1, '/monitor', 'Monitor', 'Layout', '/monitor/online', 'computer',
+       FALSE, FALSE, FALSE, NULL, 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2000);
+
+-- 在线用户
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2010, '在线用户', 2000, 2, '/monitor/online', 'MonitorOnline', 'monitor/online/index', NULL, 'user',
+       FALSE, FALSE, FALSE, NULL, 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2010);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2011, '列表', 2010, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'monitor:online:list', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2011);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2012, '强退', 2010, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'monitor:online:kickout', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2012);
+
+-- 系统日志
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2030, '系统日志', 2000, 2, '/monitor/log', 'MonitorLog', 'monitor/log/index', NULL, 'history',
+       FALSE, FALSE, FALSE, NULL, 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2030);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2031, '列表', 2030, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'monitor:log:list', 1, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2031);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2032, '详情', 2030, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'monitor:log:get', 2, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2032);
+
+INSERT INTO sys_menu (id, title, parent_id, type, path, name, component, redirect, icon,
+                      is_external, is_cache, is_hidden, permission, sort, status,
+                      create_user, create_time)
+SELECT 2033, '导出', 2030, 3, NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, 'monitor:log:export', 3, 1, 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE id = 2033);
 `
 	if _, err := db.Exec(seedMenus); err != nil {
 		return err
@@ -991,6 +1053,7 @@ CREATE TABLE IF NOT EXISTS sys_storage (
     access_key  VARCHAR(255) DEFAULT NULL,
     secret_key  VARCHAR(255) DEFAULT NULL,
     endpoint    VARCHAR(255) DEFAULT NULL,
+    region      VARCHAR(100) DEFAULT NULL,
     bucket_name VARCHAR(255) NOT NULL,
     domain      VARCHAR(255) DEFAULT NULL,
     description VARCHAR(200) DEFAULT NULL,
@@ -1009,6 +1072,24 @@ CREATE INDEX IF NOT EXISTS idx_storage_update_user ON sys_storage (update_user);
 `
 		if _, err := db.Exec(ddl); err != nil {
 			return err
+		}
+	} else {
+		// 已存在表时，确保新增的 region 字段已创建，用于兼容七牛等需要 Region 的对象存储。
+		const checkRegion = `
+SELECT 1
+FROM information_schema.columns
+WHERE table_name = 'sys_storage' AND column_name = 'region'
+LIMIT 1;
+`
+		var dummy int
+		err := db.QueryRow(checkRegion).Scan(&dummy)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if err == sql.ErrNoRows {
+			if _, err := db.Exec(`ALTER TABLE sys_storage ADD COLUMN region VARCHAR(100) DEFAULT NULL;`); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1097,7 +1178,6 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_client WHERE id = 1);
 	}
 	return nil
 }
-
 
 func ensureSysRoleMenu(db *sql.DB) error {
 	const checkTable = `SELECT to_regclass('public.sys_role_menu');`
@@ -1397,5 +1477,51 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_dict_item WHERE id = 11);
 		return err
 	}
 
+	return nil
+}
+
+// ensureSysLog 创建 sys_log 表（结构参考 Java Postgres main_table.sql）。
+func ensureSysLog(db *sql.DB) error {
+	const checkTable = `SELECT to_regclass('public.sys_log');`
+	var tableName sql.NullString
+	if err := db.QueryRow(checkTable).Scan(&tableName); err != nil {
+		return err
+	}
+	if tableName.Valid {
+		return nil
+	}
+
+	const ddl = `
+CREATE TABLE IF NOT EXISTS sys_log (
+    id               BIGINT       NOT NULL,
+    trace_id         VARCHAR(255) DEFAULT NULL,
+    description      VARCHAR(255) NOT NULL,
+    module           VARCHAR(100) NOT NULL,
+    request_url      VARCHAR(512) NOT NULL,
+    request_method   VARCHAR(10)  NOT NULL,
+    request_headers  TEXT         DEFAULT NULL,
+    request_body     TEXT         DEFAULT NULL,
+    status_code      INTEGER      NOT NULL,
+    response_headers TEXT         DEFAULT NULL,
+    response_body    TEXT         DEFAULT NULL,
+    time_taken       BIGINT       NOT NULL,
+    ip               VARCHAR(100) DEFAULT NULL,
+    address          VARCHAR(255) DEFAULT NULL,
+    browser          VARCHAR(100) DEFAULT NULL,
+    os               VARCHAR(100) DEFAULT NULL,
+    status           SMALLINT     NOT NULL DEFAULT 1,
+    error_msg        TEXT         DEFAULT NULL,
+    create_user      BIGINT       DEFAULT NULL,
+    create_time      TIMESTAMP    NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_log_module      ON sys_log (module);
+CREATE INDEX IF NOT EXISTS idx_log_ip          ON sys_log (ip);
+CREATE INDEX IF NOT EXISTS idx_log_address     ON sys_log (address);
+CREATE INDEX IF NOT EXISTS idx_log_create_time ON sys_log (create_time);
+`
+	if _, err := db.Exec(ddl); err != nil {
+		return err
+	}
 	return nil
 }

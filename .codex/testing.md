@@ -7,6 +7,16 @@
 - 风险评估：
   - 由于缺少针对 `/system/storage`、`/system/client`、`/common/dict/option/site` 的自动化用例，目前仅能保证编译通过与基本逻辑正确，建议后续补充 HTTP 层接口测试或集成测试。
 
+### 2025-11-20（Codex）backend-go 系统监控 / 在线用户 / 系统日志补充验证
+
+- 测试命令：
+  - 在 `backend-go` 目录再次执行：`go test ./...`
+- 测试结果：
+  - 新增文件 `internal/interfaces/http/online_handler.go`、`internal/interfaces/http/log_handler.go` 以及相应对 `auth_handler.go`、`migrate.go`、`cmd/admin/main.go` 的修改均能通过编译。
+- 风险评估：
+  - 由于当前环境未实际启动 Gin 服务与前端联调，尚未对 `/monitor/online`、`/system/log` 实际 HTTP 行为进行自动化验证。
+  - 在线用户功能使用内存存储，日志查询依赖已有 `sys_log` 表数据，建议在本地环境按 `verification.md` 中列出的步骤进行一次完整的页面级冒烟测试。
+
 ---
 
 ## 2025-11-20（Codex）backend-python 基础接口联调记录
