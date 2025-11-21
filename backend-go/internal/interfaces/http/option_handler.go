@@ -2,6 +2,7 @@ package http
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -132,10 +133,12 @@ func (h *OptionHandler) UpdateOption(c *gin.Context) {
 		return
 	}
 
+	// 这里 Value 使用 interface{}，以兼容前端传递字符串、数字、布尔等多种类型，
+	// 避免 Go 的 JSON 反序列化因类型不匹配而报错（例如 value 为 0 时不能直接解到 string）。
 	var body []struct {
-		ID    int64  `json:"id"`
-		Code  string `json:"code"`
-		Value string `json:"value"`
+		ID    int64       `json:"id"`
+		Code  string      `json:"code"`
+		Value interface{} `json:"value"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || len(body) == 0 {
 		Fail(c, "400", "请求参数不正确")
@@ -158,7 +161,9 @@ UPDATE sys_option
 `
 	now := time.Now()
 	for _, o := range body {
-		if _, err := tx.ExecContext(c.Request.Context(), stmt, o.Value, userID, now, o.ID, o.Code); err != nil {
+		// 将任意类型的 Value 转换为字符串存入数据库，保持与 Java 版本一致的行为。
+		valStr := toOptionValueString(o.Value)
+		if _, err := tx.ExecContext(c.Request.Context(), stmt, valStr, userID, now, o.ID, o.Code); err != nil {
 			Fail(c, "500", "保存系统配置失败")
 			return
 		}
@@ -219,4 +224,34 @@ func (h *OptionHandler) ResetOptionValue(c *gin.Context) {
 		return
 	}
 	OK(c, true)
+}
+
+// toOptionValueString 将任意 JSON 解析后的值转换为字符串，便于存入 sys_option.value。
+// - 字符串：直接返回
+// - 数字：转为不带小数的整数字符串（如 0, 1, 2）
+// - 布尔：true/false
+// - nil：空串
+// - 其他复杂类型：序列化为 JSON 字符串
+func toOptionValueString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return t
+	case float64:
+		// JSON 数字默认解析为 float64，这里统一按整数方式输出（当前配置值场景足够）。
+		return strconv.FormatInt(int64(t), 10)
+	case bool:
+		if t {
+			return "true"
+		}
+		return "false"
+	default:
+		b, err := json.Marshal(t)
+		if err != nil {
+			return ""
+		}
+		return string(b)
+	}
 }

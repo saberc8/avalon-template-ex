@@ -169,3 +169,17 @@
 - 风险评估：
   - 由于未在本环境中实际启动 Gin 服务并对 `/auth/*`、`/system/*`、`/monitor/*` 接口进行 HTTP 访问，尚未验证中间件在真实请求流水线中的表现。
   - 日志中间件当前同步写入数据库，在高并发场景下可能增加少量延迟，建议后续按需改造为异步落库并在本地压测环境中评估性能影响。
+
+---
+
+### 2025-11-21（Codex）backend-python /system/user 模块迁移静态校验
+
+- 测试命令（仅语法校验）：
+  - 在仓库根目录下执行：`python3 -m py_compile backend-python/app/**/*.py`
+- 测试结果：
+  - 新增的 `backend-python/app/id_generator.py`、`backend-python/app/security/password.py` 中 `PasswordHasher` 扩展，以及 `backend-python/app/routers/system_user.py` 通过 `py_compile` 语法检查，未发现语法错误。
+  - 由于当前环境未配置 PostgreSQL 与运行 FastAPI 的完整依赖，无法在此容器内真实启动服务或发起 HTTP 请求，仅完成静态代码层面的验证。
+- 风险评估：
+  - `/system/user` 相关接口（分页查询、列表、详情、新增、修改、删除、重置密码、分配角色、导出、导入解析与导入）均直接使用 PostgreSQL 的 `sys_user`、`sys_user_role`、`sys_role` 等表，需确保数据库结构与 Java/Go 版本完全一致。
+  - 当前未编写自动化 HTTP 测试用例，建议在本地配置数据库后，通过 pc-admin-vue3 前端或 Postman 针对 `/system/user` 全流程进行一次冒烟验证，重点关注密码加密、角色绑定以及系统内置用户删除保护等行为是否与 Java/Go 版本一致。
+[2025-11-21 16:27:42] PHP backend：暂未运行自动化测试（容器内无 php 可执行文件）；建议在本地环境通过 php -l 与实际请求联调验证 /system/dict、/system/option、/common/* 接口。

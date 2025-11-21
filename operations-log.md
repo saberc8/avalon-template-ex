@@ -209,3 +209,45 @@
 - 所有查询与写入均复用原有 PostgreSQL sys_* 表结构，响应结构对齐 pc-admin 前端的类型定义，便于与你的前端直接共用。
 - 关键逻辑包括：用户角色绑定、角色菜单/部门绑定、菜单树构造、部门树构造、系统内置数据的删除/禁用保护等，均参考 Go 版本行为进行迁移。
 - 后续如有需要，可继续迁移剩余 /system/storage、/system/client、/system/dict 等模块，保证 PHP 版本后端功能完全覆盖 Java/Go。
+
+---
+
+## 2025-11-21（Codex）backend-python /system/user 模块迁移记录
+
+- 完成内容：
+  - ID 生成与密码加密能力：
+    - 新增 `backend-python/app/id_generator.py`，实现基于毫秒时间戳的进程内单调递增 ID 生成逻辑，与 Go 版 `internal/infrastructure/id.Next` 行为保持一致，用于 `/system/*` 新增记录的主键生成。
+    - 扩展 `backend-python/app/security/password.py`：
+      - 保留原有 `PasswordVerifier` 行为不变（兼容 `{bcrypt}` 前缀格式）。
+      - 新增 `PasswordHasher.hash()`，生成带 `{bcrypt}` 前缀的 BCrypt 哈希，以对齐 Java/Go 版密码存储格式，供创建用户与重置密码时使用。
+  - `/system/user` 模块接口迁移（参考 backend-go `SystemUserHandler` 与 Java `UserController`）：
+    - 新增 `backend-python/app/routers/system_user.py`，并在 `backend-python/app/main.py` 中注册路由，完整覆盖以下接口：
+      - `GET /system/user`：分页查询用户列表，支持按描述（用户名/昵称/描述）、状态、部门筛选，返回 `{"list": UserResp[], "total": number}`，字段包括 `deptName/roleIds/roleNames/disabled` 等，与 pc-admin-vue3 `UserResp` 类型一致。
+      - `GET /system/user/list`：按可选 `userIds` 查询全部或部分用户列表，结构与分页接口中的 `UserResp` 相同，便于前端在角色配置等场景复用。
+      - `GET /system/user/{id}`：返回单个用户详情，包含 `pwdResetTime`、角色信息等，对齐 Java/Go `UserDetailResp`。
+      - `POST /system/user`：新增用户：
+        - 使用 RSA 私钥（`AUTH_RSA_PRIVATE_KEY`）解密前端传入的加密密码；
+        - 校验密码长度 8-32 且同时包含字母和数字；
+        - 通过 `PasswordHasher` 生成 `{bcrypt}` 哈希后写入 `sys_user.password`，并设置 `pwd_reset_time/create_user/create_time`；
+        - 根据 `roleIds` 写入 `sys_user_role` 关系（使用 `next_id()` 生成主键），与 Go 版逻辑一致。
+      - `PUT /system/user/{id}`：修改用户基础信息及角色绑定，更新 `sys_user` 并先清空再重建 `sys_user_role` 记录。
+      - `DELETE /system/user`：批量删除用户，入参为 `{ ids: number[] }`，跳过系统内置用户（`is_system=true`），其余用户先删除关联角色再删除用户记录。
+      - `PATCH /system/user/{id}/password`：重置密码，沿用登录同款 RSA 解密与密码强度校验逻辑，并更新 `pwd_reset_time`/`update_user`/`update_time`。
+      - `PATCH /system/user/{id}/role`：仅更新用户角色绑定，删除原有关联后重建 `sys_user_role`。
+      - `GET /system/user/export`：导出 CSV 文件（`username,nickname,gender,email,phone`），直接返回文件流（`text/csv` + `Content-Disposition`），与 Go 版导出行为兼容。
+      - `GET /system/user/import/template`：返回用户导入 CSV 模板，仅包含列头，便于前端下载。
+      - `POST /system/user/import/parse`：接收上传文件但暂不做真实解析，返回简化版 `UserImportParseResp`（全部为 0），与 Go 当前占位实现保持一致，保证前端导入流程可走通。
+      - `POST /system/user/import`：返回占位版 `UserImportResp`（总数/插入数/更新数均为 0），对齐 Java/Go 的简化导入实现。
+    - 所有需要登录态的写操作均从 `Authorization` 头解析 JWT（`userId`），未登录时返回统一的 `401` 业务码与提示文案，保持与 auth 模块一致的行为。
+  - 响应结构与前端契约：
+    - 复用 `backend-python/app/api_response.ok/fail` 作为统一响应包装，除导出与模板下载外，其余接口均返回 `ApiRes<T>` 结构。
+    - 时间字段统一格式化为 `YYYY-MM-DD HH:MM:SS`，与 Go 端 `formatTime` 保持一致，避免前端解析差异。
+
+- 行为与差异说明：
+  - 事务控制：当前 Python 版仍基于简单的连接级提交模型（`get_db_cursor` 每次请求一个连接并在上下文结束时提交），未显式使用数据库事务；在单次请求中多条写操作出现部分失败的概率较低，但与 Go 端显式事务回滚相比，理论上仍存在极小的部分提交风险，后续可按需要引入显式事务封装。
+  - 导入功能：与 Go/Java 现有简化实现保持一致，仅为前端流程提供占位能力，未真正解析 Excel/CSV 内容，后续如需严格对齐 Java 版完整导入，可在现有结构上补充解析与校验逻辑。
+
+- 后续可选工作：
+  - 继续迁移 `/system/role`、`/system/menu`、`/system/dept` 等模块到 Python，直接参考 backend-go 对应 handler 与 PHP 版实现，保证与 pc-admin-vue3 所有系统管理页面完全兼容。
+  - 为 backend-python 增补基础 HTTP 冒烟测试（使用 `pytest` + `httpx` 或 FastAPI TestClient），覆盖 `/auth/*`、`/common/*` 与 `/system/user/*` 核心路径，并将执行记录写入 `.codex/testing.md`。
+[2025-11-21 16:26:52] 实现 PHP 版 /system/dict、/system/option、/common/* 路由，与 Java/Go/API 保持一致。

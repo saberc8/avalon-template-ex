@@ -12,6 +12,9 @@ use Voc\Admin\Application\Auth\AuthService;
 use Voc\Admin\Interfaces\Http\AuthRoutes;
 use Voc\Admin\Interfaces\Http\UserRoutes;
 use Voc\Admin\Interfaces\Http\SystemUserRoutes;
+use Voc\Admin\Interfaces\Http\CommonRoutes;
+use Voc\Admin\Interfaces\Http\DictRoutes;
+use Voc\Admin\Interfaces\Http\OptionRoutes;
 use Voc\Admin\Interfaces\Http\RoleRoutes;
 use Voc\Admin\Interfaces\Http\MenuRoutes;
 use Voc\Admin\Interfaces\Http\DeptRoutes;
@@ -75,6 +78,9 @@ $authService = new AuthService($db, $rsaDecryptor, $passwordService, $tokenServi
 // 系统管理：用户管理 /system/user
 (new SystemUserRoutes($db, $tokenService, $rsaDecryptor, $passwordService, $responder))->register($app);
 
+// 公共接口：/common/*
+(new CommonRoutes($db, $responder))->register($app);
+
 // 系统管理：角色管理 /system/role
 (new RoleRoutes($db, $tokenService, $responder))->register($app);
 
@@ -83,6 +89,12 @@ $authService = new AuthService($db, $rsaDecryptor, $passwordService, $tokenServi
 
 // 系统管理：部门管理 /system/dept
 (new DeptRoutes($db, $tokenService, $responder))->register($app);
+
+// 系统管理：字典管理 /system/dict 与 /system/dict/item
+(new DictRoutes($db, $tokenService, $responder))->register($app);
+
+// 系统管理：参数管理 /system/option
+(new OptionRoutes($db, $tokenService, $responder))->register($app);
 
 // TODO：后续补充 /system/*、/common/*、/user/profile 等全部接口迁移
 
