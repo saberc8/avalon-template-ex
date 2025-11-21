@@ -88,12 +88,12 @@ func main() {
 	commonHandler := httpif.NewCommonHandler(pg)
 	commonHandler.RegisterCommonRoutes(r)
 
-	// 验证码接口（简化版）
-	captchaHandler := httpif.NewCaptchaHandler()
+	// 验证码接口（登录图片验证码）
+	captchaHandler := httpif.NewCaptchaHandler(pg)
 	captchaHandler.RegisterCaptchaRoutes(r)
 
 	// 登录与用户接口
-	authHandler := httpif.NewAuthHandler(authSvc, onlineStore)
+	authHandler := httpif.NewAuthHandler(authSvc, onlineStore, pg)
 	authHandler.RegisterAuthRoutes(r)
 	userHandler := httpif.NewUserHandler(userRepo, roleRepo, menuRepo, tokenSvc)
 	userHandler.RegisterUserRoutes(r)

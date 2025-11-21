@@ -1,9 +1,11 @@
 package http
 
 import (
+	"database/sql"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mojocn/base64Captcha"
 
 	"voc-go-backend/internal/application/auth"
 )
@@ -12,12 +14,16 @@ import (
 type AuthHandler struct {
 	svc    *auth.Service
 	online *OnlineStore
+	db     *sql.DB
 }
 
-func NewAuthHandler(svc *auth.Service, online *OnlineStore) *AuthHandler {
+// NewAuthHandler 创建认证接口处理器。
+// 其中 db 用于读取登录相关配置（如是否启用验证码）。
+func NewAuthHandler(svc *auth.Service, online *OnlineStore, db *sql.DB) *AuthHandler {
 	return &AuthHandler{
 		svc:    svc,
 		online: online,
+		db:     db,
 	}
 }
 
@@ -34,6 +40,34 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		// 参数缺失或格式不正确
 		Fail(c, "400", "参数缺失或格式不正确")
 		return
+	}
+
+	// 当配置启用登录验证码且为账号登录时，先校验图形验证码。
+	// 行为对齐 Java AccountLoginHandler.preLogin：
+	// - LOGIN_CAPTCHA_ENABLED=0：不校验验证码；
+	// - LOGIN_CAPTCHA_ENABLED!=0：必须校验 uuid + captcha。
+	authType := strings.ToUpper(strings.TrimSpace(req.AuthType))
+	if authType == "" || authType == "ACCOUNT" {
+		enabled, err := isLoginCaptchaEnabled(c.Request.Context(), h.db)
+		if err != nil {
+			Fail(c, "500", "查询登录验证码配置失败")
+			return
+		}
+		if enabled {
+			if strings.TrimSpace(req.Captcha) == "" {
+				Fail(c, "400", "验证码不能为空")
+				return
+			}
+			if strings.TrimSpace(req.UUID) == "" {
+				Fail(c, "400", "验证码标识不能为空")
+				return
+			}
+			// 使用 base64Captcha.DefaultMemStore 校验验证码并在成功时自动删除。
+			if ok := base64Captcha.DefaultMemStore.Verify(req.UUID, req.Captcha, true); !ok {
+				Fail(c, "400", "验证码不正确或已过期")
+				return
+			}
+		}
 	}
 
 	resp, err := h.svc.Login(c.Request.Context(), req)
