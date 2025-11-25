@@ -6,6 +6,8 @@ import { TokenService } from './jwt/jwt.service';
 import { LoginDto, LoginResp } from './dto/login.dto';
 import { UserInfo } from './models/user-info.model';
 import { RouteItem } from './models/route-item.model';
+import { OptionService } from '../../shared/option/option.service';
+import { takeCaptcha } from '../../shared/captcha/captcha.store';
 
 /**
  * 认证与当前用户相关业务逻辑。
@@ -17,6 +19,7 @@ export class AuthService {
     private readonly rsa: RSADecryptor,
     private readonly pwdService: PasswordService,
     private readonly tokenService: TokenService,
+    private readonly optionService: OptionService,
   ) {}
 
   /**
@@ -35,6 +38,27 @@ export class AuthService {
     }
     if (!dto.password?.trim()) {
       throw new Error('密码不能为空');
+    }
+
+    // 按配置校验图形验证码
+    const loginCaptchaEnabled =
+      await this.optionService.getIntValueByCode('LOGIN_CAPTCHA_ENABLED');
+    if (loginCaptchaEnabled === 1) {
+      if (!dto.captcha?.trim()) {
+        throw new Error('验证码不能为空');
+      }
+      if (!dto.uuid?.trim()) {
+        throw new Error('验证码标识不能为空');
+      }
+      const rec = takeCaptcha(dto.uuid.trim());
+      if (!rec) {
+        throw new Error('验证码已失效');
+      }
+      if (
+        dto.captcha.trim().toLowerCase() !== rec.code.toLowerCase()
+      ) {
+        throw new Error('验证码不正确');
+      }
     }
 
     let rawPassword: string;
@@ -61,7 +85,12 @@ export class AuthService {
     }
 
     const token = this.tokenService.generate(Number(user.id));
-    return { token };
+    return {
+      token,
+      userId: Number(user.id),
+      username: user.username,
+      nickname: user.nickname,
+    };
   }
 
   /**
@@ -289,4 +318,3 @@ function formatDateTime(date: Date): string {
   const ss = pad(date.getSeconds());
   return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
 }
-

@@ -15,6 +15,11 @@ use Voc\Admin\Interfaces\Http\SystemUserRoutes;
 use Voc\Admin\Interfaces\Http\CommonRoutes;
 use Voc\Admin\Interfaces\Http\DictRoutes;
 use Voc\Admin\Interfaces\Http\OptionRoutes;
+use Voc\Admin\Interfaces\Http\LogRoutes;
+use Voc\Admin\Interfaces\Http\StorageRoutes;
+use Voc\Admin\Interfaces\Http\ClientRoutes;
+use Voc\Admin\Interfaces\Http\CaptchaRoutes;
+use Voc\Admin\Interfaces\Http\OnlineUserRoutes;
 use Voc\Admin\Interfaces\Http\RoleRoutes;
 use Voc\Admin\Interfaces\Http\MenuRoutes;
 use Voc\Admin\Interfaces\Http\DeptRoutes;
@@ -96,7 +101,20 @@ $authService = new AuthService($db, $rsaDecryptor, $passwordService, $tokenServi
 // 系统管理：参数管理 /system/option
 (new OptionRoutes($db, $tokenService, $responder))->register($app);
 
-// TODO：后续补充 /system/*、/common/*、/user/profile 等全部接口迁移
+// 系统管理：日志管理 /system/log
+(new LogRoutes($db, $responder))->register($app);
+
+// 系统管理：存储配置 /system/storage
+(new StorageRoutes($db, $tokenService, $rsaDecryptor, $responder))->register($app);
+
+// 系统管理：客户端配置 /system/client
+(new ClientRoutes($db, $tokenService, $responder))->register($app);
+
+// 验证码：/captcha/*
+(new CaptchaRoutes($db, $responder))->register($app);
+
+// 监控：在线用户 /monitor/online
+(new OnlineUserRoutes($tokenService, $responder))->register($app);
 
 // 启动 HTTP 服务
 $port = getenv('HTTP_PORT') ?: '4398';

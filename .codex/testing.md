@@ -160,6 +160,22 @@
 
 ---
 
+### 2025-11-24（Codex）backend-node 在线用户接口编译验证
+
+- 测试命令（在 `backend-node` 目录）：
+  - `npm run build`
+- 执行结果：
+  - 在 `src/modules/auth` 中新增在线用户内存存储（`online.store.ts`）与控制器（`online.controller.ts`），并接入登录/登出流程后执行 `npm run build`，TypeScript 编译报错集中在既有模块：
+    - `src/modules/system/option/system-option.controller.ts`：调用 `$transaction` 时传入 `Promise[]`，与 Prisma 期望的 `PrismaPromise[]` 不匹配。
+    - `src/modules/system/user/system-user.controller.ts`：`$queryRaw` 使用模板字符串形式与类型定义不兼容、`PasswordService` 缺少 `hash` 方法签名、`Express.Multer.File` 类型未找到。
+    - `src/shared/id/id.ts`：使用 BigInt 字面量，但 `tsconfig.build.json` 的 `target` 低于 ES2020。
+  - 本次新增的在线用户相关文件及对 `auth.module.ts` / `auth.service.ts` / `auth.controller.ts` 的修改在类型层面均未引入新的错误。
+- 风险评估：
+  - 由于上述既有类型问题尚未修复，当前无法在 Codex 环境中完成 backend-node 的全量编译验证；在线用户模块本身仅依赖 Nest 注入与内存 Map，不涉及数据库结构或 Prisma 事务，运行时风险较低。
+  - 建议在本地修复 Prisma 事务参数类型与 BigInt 目标版本设置后，再执行完整的 `npm run build` 与 HTTP 冒烟测试（重点验证 `/monitor/online` 列表与 `DELETE /monitor/online/{token}`、`POST /auth/logout` 行为）。
+
+---
+
 ### 2025-11-20（Codex）backend-go 系统操作日志中间件接入测试记录
 
 - 测试命令：
@@ -182,4 +198,16 @@
 - 风险评估：
   - `/system/user` 相关接口（分页查询、列表、详情、新增、修改、删除、重置密码、分配角色、导出、导入解析与导入）均直接使用 PostgreSQL 的 `sys_user`、`sys_user_role`、`sys_role` 等表，需确保数据库结构与 Java/Go 版本完全一致。
   - 当前未编写自动化 HTTP 测试用例，建议在本地配置数据库后，通过 pc-admin-vue3 前端或 Postman 针对 `/system/user` 全流程进行一次冒烟验证，重点关注密码加密、角色绑定以及系统内置用户删除保护等行为是否与 Java/Go 版本一致。
+
+### 2025-11-21（Codex）backend-python /system/role 模块迁移静态校验
+
+- 测试命令（仅语法校验）：
+  - 在仓库根目录下执行：`python3 -m py_compile backend-python/app/**/*.py`
+- 测试结果：
+  - 新增的 `backend-python/app/routers/system_role.py` 以及对 `backend-python/app/main.py` 的路由注册修改，同样通过 `py_compile` 语法检查，未发现语法错误。
+  - 受限于当前环境，仍未启动 FastAPI 服务或连接实际数据库，只完成静态层面的校验。
+- 风险评估：
+  - `/system/role` 相关接口（角色列表、详情、新增、修改、删除、权限分配、角色关联用户分页、分配/取消分配用户、查询角色用户 ID 列表）直接依赖 `sys_role`、`sys_role_menu`、`sys_role_dept`、`sys_user_role` 等表，需确保表结构与 Java/Go 版本保持一致。
+  - 与 `/system/user` 一样，目前缺少针对 `/system/role/*` 的自动化 HTTP 测试，建议在本地通过 pc-admin-vue3 或 Postman 做一轮冒烟测试，重点关注系统内置 `admin` 角色的保护逻辑、菜单/部门权限勾选及关联用户分页行为是否与 Java/Go 一致。
 [2025-11-21 16:27:42] PHP backend：暂未运行自动化测试（容器内无 php 可执行文件）；建议在本地环境通过 php -l 与实际请求联调验证 /system/dict、/system/option、/common/* 接口。
+[2025-11-21 16:53:24] PHP backend：新增 LogRoutes/StorageRoutes/ClientRoutes/CaptchaRoutes/OnlineUserRoutes 并在 public/index.php 注册；容器缺少 php 可执行文件，未运行语法检查与集成测试，需在本地 PHP 环境手动验证相关 API。

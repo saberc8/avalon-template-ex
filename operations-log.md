@@ -249,5 +249,93 @@
 
 - 后续可选工作：
   - 继续迁移 `/system/role`、`/system/menu`、`/system/dept` 等模块到 Python，直接参考 backend-go 对应 handler 与 PHP 版实现，保证与 pc-admin-vue3 所有系统管理页面完全兼容。
-  - 为 backend-python 增补基础 HTTP 冒烟测试（使用 `pytest` + `httpx` 或 FastAPI TestClient），覆盖 `/auth/*`、`/common/*` 与 `/system/user/*` 核心路径，并将执行记录写入 `.codex/testing.md`。
+  - 为 backend-python 增补基础 HTTP 冒烟测试（使用 `pytest` + `httpx` 或 FastAPI TestClient），覆盖 `/auth/*`、`/common/*` 与 `/system/user/*` 核心路径，并将执行记录写入 `.codex/testing.md`。 
+
+---
+
+## 2025-11-21（Codex）backend-python /system/role 模块迁移记录
+
+- 完成内容：
+  - 新增 `backend-python/app/routers/system_role.py` 并在 `backend-python/app/main.py` 中注册路由，完整迁移 Java/Go `/system/role` 相关接口到 FastAPI：
+    - 角色基础信息：
+      - `GET /system/role/list`：查询角色列表，支持按 `description` 模糊过滤名称与描述，返回字段包括 `dataScope/isSystem/createUserString/createTime/updateUserString/updateTime/disabled`，与前端 `RoleResp` 对齐（`disabled` 对 admin 系统角色置为 true）。
+      - `GET /system/role/{id}`：返回单个角色详情，包括 `menuIds/deptIds/menuCheckStrictly/deptCheckStrictly`，结构对齐 `RoleDetailResp`。
+      - `POST /system/role`：新增角色，按 Go 版逻辑默认 `sort=999/dataScope=4/menuCheckStrictly=true`，`deptCheckStrictly` 从请求体读取，插入 `sys_role` 与 `sys_role_dept`。
+      - `PUT /system/role/{id}`：修改角色基础信息与部门范围，更新 `sys_role` 后重建 `sys_role_dept` 记录。
+      - `DELETE /system/role`：批量删除角色（请求体为 `{ ids: number[] }`），删除前检查系统内置 `admin` 角色（`is_system=true && code='admin'`）并跳过，其余同步清理 `sys_role_menu/sys_role_dept/sys_user_role/sys_role`。
+    - 角色菜单权限：
+      - `PUT /system/role/{id}/permission`：清空并重建 `sys_role_menu`，同时更新 `sys_role.menu_check_strictly` 与审计字段，行为与 Go `UpdateRolePermission` 对应。
+    - 角色关联用户：
+      - `GET /system/role/{id}/user`：查询指定角色下的关联用户列表，支持 `page/size/description`，先取全量再在内存中分页，与 Go 版近似实现；通过额外查询补充每个用户的 `roleIds/roleNames`，并对“系统用户 + admin 角色”打上 `disabled` 标记。
+      - `POST /system/role/{id}/user`：为角色批量分配用户，请求体为用户 ID 数组，向 `sys_user_role` 写入记录（主键使用 `next_id()`)，并使用 `ON CONFLICT` 避免重复。
+      - `DELETE /system/role/user`：按 user_role 记录 ID 数组删除关联关系，对应 Go 版 `UnassignFromUsers`。
+      - `GET /system/role/{id}/user/id`：返回该角色下所有用户 ID 列表，与前端“已选用户”列表契约一致。
+  - 鉴权与时间处理：
+    - 所有写操作（新增、修改、删除、分配/取消分配权限或用户）均通过 `_current_user_id` 从 `Authorization` 头解析 JWT，未授权时统一返回业务码 `401` 与“未授权，请重新登录”提示。
+    - 时间字段使用 `_format_time` 统一输出 `YYYY-MM-DD HH:MM:SS` 文本，与 Go/Rust/Node/PHP 版本保持一致。
+
+- 行为与差异说明：
+  - 事务：当前实现与 `/system/user` 一样，基于 `get_db_cursor` 的“单连接 + 结束时 commit”模式，未在 Python 端显式包裹事务；相比 Go 版 `BeginTx/Commit`，在极端错误场景下存在部分操作成功但后续失败的理论风险，后续可在需要时引入事务封装。
+  - 分页策略：`GET /system/role/{id}/user` 采用“查询全量后在内存中分页”的方式，与 Go Handler 保持一致；在用户数量较大时可能需要进一步优化为数据库分页。
+
+- 后续可选工作：
+  - 继续迁移 `/system/menu`、`/system/dept`、`/system/dict`、`/system/option` 等模块到 Python，以实现与 Java/Go/PHP/Node 完全一致的系统管理端 API。
+  - 在本地 Python 环境中结合 pc-admin-vue3 对 `/system/role` 相关页面进行一轮完整冒烟测试，并在 `.codex/testing.md` 中补充 HTTP 级别验证记录。 
 [2025-11-21 16:26:52] 实现 PHP 版 /system/dict、/system/option、/common/* 路由，与 Java/Go/API 保持一致。
+[2025-11-21 16:52:46] PHP 迁移：实现日志(/system/log)、存储(/system/storage)、客户端(/system/client)、验证码(/captcha/image)、在线用户(/monitor/online) 路由，保持与 Java/Go 版本接口兼容。
+
+---
+
+## 2025-11-24（Codex）— backend-node 在线用户接口迁移记录
+
+- 完成内容：
+  - 在线用户内存存储：
+    - 在 `backend-node/src/modules/auth/online.store.ts` 中实现 `OnlineStoreService`，使用进程内 `Map<string, OnlineSession>` 维护在线会话信息，字段对齐 Go 版 `OnlineSession` 与前端 `OnlineUserResp`（包含 `userId/username/nickname/token/clientType/clientId/ip/browser/loginTime/lastActiveTime` 等）。
+    - 提供 `recordLogin`/`removeByToken`/`list` 三个核心方法：
+      - `recordLogin` 在登录成功后记录当前用户会话（从请求中提取 IP 和 User-Agent，客户端类型固定为 `PC`）。
+      - `removeByToken` 按 token 删除内存中的在线会话记录，用于登出与强退。
+      - `list` 支持按昵称与登录时间范围筛选在线会话，并按登录时间倒序分页返回。
+  - 在线用户 HTTP 接口：
+    - 新增 `backend-node/src/modules/auth/online.controller.ts`，实现：
+      - `GET /monitor/online`：接收 `page/size/nickname/loginTime[]` 查询参数，解析时间范围后调用 `OnlineStoreService.list`，返回 `PageResult<OnlineUserResp>`，行为对齐 backend-go `OnlineUserHandler.PageOnlineUser`。
+      - `DELETE /monitor/online/{token}`：从路径参数获取目标 token，结合 `Authorization` 头解析当前 token，做“令牌不能为空”“不能强退自己”“未授权请重新登录”等校验后，调用 `OnlineStoreService.removeByToken`，行为参考 Go/Java 的强退实现。
+  - 认证流程集成：
+    - 调整 `AuthModule` 将 `OnlineStoreService` 注册为提供者，并将 `OnlineUserController` 一并挂载到认证模块，避免额外新建模块。
+    - 扩展 `LoginResp` 为 `{ token,userId,username,nickname }`，在 `AuthService.login` 中返回用户基本信息，便于登录成功后记录在线会话。
+    - 更新 `AuthController.login`：
+      - 注入 `OnlineStoreService` 并增加 `@Req() req` 参数，从 `X-Forwarded-For`/`req.ip` 与 `User-Agent` 提取 IP 与 UA。
+      - 登录成功后调用 `onlineStore.recordLogin` 写入在线会话，再通过 `ok({ token: resp.token })` 对前端仅返回 `token` 字段，保持现有协议不变。
+    - 更新 `AuthController.logout`：
+      - 解析 `Authorization` 中的原始 token，并调用 `onlineStore.removeByToken` 移除当前会话记录，实现与 Go 版 `/auth/logout` 类似的在线用户统计行为。
+- 验证与已知问题：
+  - 在 `backend-node` 目录执行 `npm run build` 时，新引入的在线用户相关文件均能通过 TypeScript 校验，但编译整体失败，报错集中在既有模块：
+    - `system-option.controller.ts` 的 Prisma `$transaction` 参数类型不匹配。
+    - `system-user.controller.ts` 中 `$queryRaw` 调用方式与类型不兼容、`PasswordService` 缺少 `hash` 方法签名、`Express.Multer.File` 类型未定义。
+    - `shared/id/id.ts` 使用 BigInt 字面量而 `tsconfig.build.json` 的 `target` 低于 ES2020。
+  - 本次未对上述历史问题做改动，以避免在 Node 后端尚未完全迁移完成时引入额外行为变化，建议在本地修复 TypeScript 配置与既有模块类型问题后，再对 `/monitor/online` 与 `/auth/logout` 做一次完整的 HTTP 冒烟测试。
+# 操作日志（自动由 Codex 维护）
+
+## 2025-11-24 — Codex
+
+- 为 `backend-go` 接入 Swagger 接口文档：
+  - 在 `backend-go/go.mod` 中引入 `github.com/swaggo/gin-swagger`、`github.com/swaggo/files`、`github.com/swaggo/swag` 等依赖，并执行 `go mod tidy`。
+  - 在 `backend-go/cmd/admin/main.go` 中添加全局 Swagger 元信息注解（标题、版本、BasePath、Bearer 认证定义），并注册 `GET /swagger/*any` 路由，绑定 Swagger UI 处理器。
+  - 使用 `swag init -g cmd/admin/main.go -o docs` 生成 `backend-go/docs` 包（`docs.go`、`swagger.json`、`swagger.yaml`），作为静态文档源。
+  - 在 `backend-go/cmd/admin/main.go` 中设置 `docs.SwaggerInfo.Host = "localhost:" + HTTP_PORT`，保证 Swagger UI 调试请求地址正确。
+  - 在 `backend-go/internal/interfaces/http/auth_handler.go` 中为登录、登出接口添加 Swagger 注解（Summary、Description、Tags、请求体与响应示例），用于初始接口示例。
+- 本次变更已通过 `cd backend-go && go build ./...` 构建验证。
+
+## 2025-11-24（Codex）— backend-node 登录解密与系统配置迁移补充
+
+- 完成内容：
+  - 新增 `backend-node/src/shared/option/option.service.ts`，提供基于 `sys_option` 的通用配置读取能力：支持按 code 读取字符串/整数值，以及按类别批量读取配置映射，行为与 Java 版 `OptionService` 一致（`value` 为空时回退 `default_value`）。
+  - 更新 `backend-node/src/modules/captcha/captcha.controller.ts` 与 `captcha.module.ts`：
+    - 在验证码接口中注入 OptionService，通过 `LOGIN_CAPTCHA_ENABLED` 配置动态控制 `isEnabled` 标志，保证“是否启用验证码登录”在 Node 端可配置。
+  - 重写 `backend-node/src/modules/auth/security/rsa.service.ts`：
+    - 移除自研 BigInt 指数运算解密逻辑，改用 Node.js 内置 `crypto` 模块的 `createPrivateKey` + `privateDecrypt`，按 PKCS#1 v1.5 方式解密 Base64 密文，私钥来源保持与 Java dev 配置一致。
+- 测试与验证：
+  - 在 `backend-node` 下执行 `npm run build` 暂未完全通过，当前失败集中在系统管理相关接口（如 `/system/option`、`/system/user`）的一些类型定义问题，与本次登录解密与验证码开关改动无直接关联。
+  - 建议在本地修复相关 TypeScript 类型错误后，再次运行 `npm run build` 与针对 `/auth/login`、`/captcha/image`、`/system/option` 的冒烟请求验证整体行为。
+- 风险与说明：
+  - 只要数据库中存在 `sys_option` 表及 `LOGIN_CAPTCHA_ENABLED` 配置项，Node 端即可根据该配置控制登录验证码开关；若 Postgres 中尚未同步该行，需要从原 Java 数据库迁移。
+  - RSA 解密逻辑调整为使用标准库实现后，前后端应继续复用原有公私钥对，若前端仍报“密码解密失败”，建议抓取前端提交的密文与 Node 环境变量中的密钥配置进行比对。

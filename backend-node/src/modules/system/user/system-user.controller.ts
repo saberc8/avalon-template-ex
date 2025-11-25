@@ -248,7 +248,7 @@ ORDER BY u.id DESC;
         idList,
       );
     } else {
-      rows = await this.prisma.$queryRawUnsafe<
+      rows = await this.prisma.$queryRaw<
         {
           id: bigint;
           username: string;
@@ -462,9 +462,8 @@ WHERE u.id = ${BigInt(id)};
     const now = new Date();
     const newId = nextId();
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `
 INSERT INTO sys_user (
@@ -503,7 +502,8 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
             BigInt(rid),
           ),
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '新增用户失败');
     }
@@ -527,6 +527,32 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
       return fail('400', 'ID 参数不正确');
     }
 
+    // 加载当前用户，便于做系统用户与重名校验
+    const existingRows = await this.prisma.$queryRaw<
+      {
+        id: bigint;
+        username: string;
+        email: string | null;
+        phone: string | null;
+        is_system: boolean;
+        nickname: string;
+      }[]
+    >`
+SELECT id,
+       username,
+       COALESCE(email, '') AS email,
+       COALESCE(phone, '') AS phone,
+       is_system,
+       nickname
+FROM sys_user
+WHERE id = ${BigInt(id)}
+LIMIT 1;
+`;
+    if (!existingRows.length) {
+      return fail('404', '用户不存在');
+    }
+    const existing = existingRows[0];
+
     const username = (body.username ?? '').trim();
     const nickname = (body.nickname ?? '').trim();
     if (!username || !nickname) {
@@ -537,12 +563,85 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
     }
     const status = body.status || 1;
 
+    // 重名校验，行为对齐 Java UserServiceImpl.update
+    const errorTpl = '修改失败，[{}] 已存在';
+    // 用户名是否重复（排除自身）
+    const unameDup = await this.prisma.$queryRaw<{ exists: number }[]>`
+SELECT 1 AS exists
+FROM sys_user
+WHERE username = ${username} AND id <> ${BigInt(id)}
+LIMIT 1;
+`;
+    if (unameDup.length) {
+      return fail('400', errorTpl.replace('{}', username));
+    }
+    const email = (body.email ?? '').trim();
+    if (email) {
+      const emailDup = await this.prisma.$queryRaw<{ exists: number }[]>`
+SELECT 1 AS exists
+FROM sys_user
+WHERE email = ${email} AND id <> ${BigInt(id)}
+LIMIT 1;
+`;
+      if (emailDup.length) {
+        return fail('400', errorTpl.replace('{}', email));
+      }
+    }
+    const phone = (body.phone ?? '').trim();
+    if (phone) {
+      const phoneDup = await this.prisma.$queryRaw<{ exists: number }[]>`
+SELECT 1 AS exists
+FROM sys_user
+WHERE phone = ${phone} AND id <> ${BigInt(id)}
+LIMIT 1;
+`;
+      if (phoneDup.length) {
+        return fail('400', errorTpl.replace('{}', phone));
+      }
+    }
+
+    // 不允许禁用当前登录用户
+    if (status === 2 && id === currentUserId) {
+      return fail('400', '不允许禁用当前用户');
+    }
+
+    // 系统内置用户的特殊限制
+    if (existing.is_system) {
+      const nick = existing.nickname || existing.username;
+      if (status === 2) {
+        return fail('400', `[${nick}] 是系统内置用户，不允许禁用`);
+      }
+      // 禁止变更系统内置用户的角色集合
+      const currentRoleRows = await this.prisma.$queryRaw<
+        { role_id: bigint }[]
+      >`
+SELECT role_id
+FROM sys_user_role
+WHERE user_id = ${BigInt(id)};
+`;
+      const currentRoleIds = currentRoleRows.map((r) => Number(r.role_id));
+      const newRoleIds = Array.isArray(body.roleIds)
+        ? body.roleIds.map((v) => Number(v)).filter((v) => Number.isFinite(v))
+        : [];
+      const setA = new Set(currentRoleIds);
+      const setB = new Set(newRoleIds);
+      const diff: number[] = [];
+      for (const v of setA) {
+        if (!setB.has(v)) diff.push(v);
+      }
+      for (const v of setB) {
+        if (!setA.has(v)) diff.push(v);
+      }
+      if (diff.length > 0) {
+        return fail('400', `[${nick}] 是系统内置用户，不允许变更角色`);
+      }
+    }
+
     const now = new Date();
     const userIdBig = BigInt(id);
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `
 UPDATE sys_user
@@ -588,9 +687,15 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
             BigInt(rid),
           ),
         ),
-      ]);
-    } catch {
-      return fail('500', '修改用户失败');
+      ];
+      await (this.prisma as any).$transaction(statements as any);
+    } catch (e: any) {
+      // 打印详细错误信息，便于排查数据库约束等问题
+      // eslint-disable-next-line no-console
+      console.error('updateUser error:', e);
+      const msg =
+        (e && (e.message || (typeof e === 'string' ? e : ''))) || '修改用户失败';
+      return fail('500', `修改用户失败：${msg}`);
     }
 
     return ok(true);
@@ -608,9 +713,8 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
     }
     const idsBig = idList.map((v) => BigInt(v));
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `DELETE FROM sys_user_role WHERE user_id = ANY($1::bigint[])`,
           idsBig,
@@ -619,7 +723,8 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
           `DELETE FROM sys_user WHERE id = ANY($1::bigint[])`,
           idsBig,
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '删除用户失败');
     }
@@ -714,9 +819,8 @@ UPDATE sys_user
     }
 
     const roleIds = body.roleIds || [];
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `DELETE FROM sys_user_role WHERE user_id = $1`,
           BigInt(id),
@@ -733,7 +837,8 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
             BigInt(rid),
           ),
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '分配角色失败');
     }
@@ -771,7 +876,7 @@ ORDER BY id;
   /** 解析导入：POST /system/user/import/parse（占位实现，保持流程可用） */
   @Post('/system/user/import/parse')
   @UseInterceptors(FileInterceptor('file'))
-  async parseImport(@UploadedFile() file?: Express.Multer.File) {
+  async parseImport(@UploadedFile() file?: any) {
     if (!file) {
       return fail('400', '文件不能为空');
     }
@@ -836,4 +941,3 @@ WHERE ur.user_id = ANY(${userIds as any}::bigint[]);
     }
   }
 }
-

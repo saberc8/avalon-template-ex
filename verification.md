@@ -61,3 +61,19 @@
 - 在线用户功能目前基于内存存储，服务重启后在线列表会清空，且“强退”不会立即使 JWT 无效，建议在生产环境前视需求补充持久化与黑名单校验。
 - 建议在接入正式环境前，与前端一起完成一次完整的系统配置与系统监控回归（配置页与监控页逐一操作、刷新与重登录验证）。
 [2025-11-21 16:27:12] 本次任务新增 PHP 路由：DictRoutes、OptionRoutes、CommonRoutes；因环境未安装 php 命令，未能执行语法检查或自动化测试，需在本地 PHP 环境中手动验证。
+[2025-11-21 16:53:54] 本轮在 PHP 侧补齐 monitor/log、system/storage、system/client、captcha/image、monitor/online 等接口，实现与 Java/Go 版本一致的路径及返回结构（在线用户列表暂返回空集合）。
+
+## 2025-11-24（Codex）backend-go Swagger 接入验证
+
+- 验证命令：
+  - `cd backend-go && go build ./...`
+- 验证结果：
+  - 编译通过，无错误。
+- 变更范围说明：
+  - 在 `backend-go/go.mod` 中引入 Swagger 相关依赖（`github.com/swaggo/gin-swagger`、`github.com/swaggo/files`、`github.com/swaggo/swag`）。
+  - 在 `backend-go/cmd/admin/main.go` 中配置 Swagger 全局注解（标题、版本、BasePath、Bearer 认证），并注册 `/swagger/*any` 路由。
+  - 使用 `swag init -g cmd/admin/main.go -o docs` 生成 `backend-go/docs` 包，作为 Swagger 文档源。
+  - 在 `backend-go/internal/interfaces/http/auth_handler.go` 中为登录与登出接口添加 Swagger 注解，作为文档示例入口。
+- 待人工/联调验证点：
+  - 启动服务后访问 `http://localhost:4398/swagger/index.html`，确认页面能正常打开且接口列表中包含认证模块。
+  - 使用 Swagger UI 对 `POST /auth/login`、`POST /auth/logout` 进行调试，确认请求、响应结构与实际业务逻辑一致。

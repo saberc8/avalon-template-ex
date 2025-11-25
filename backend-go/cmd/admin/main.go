@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	appauth "voc-go-backend/internal/application/auth"
+	docs "voc-go-backend/docs"
 	rbacdomain "voc-go-backend/internal/domain/rbac"
 	"voc-go-backend/internal/domain/user"
 	"voc-go-backend/internal/infrastructure/db"
@@ -17,6 +20,15 @@ import (
 	"voc-go-backend/internal/infrastructure/security"
 	httpif "voc-go-backend/internal/interfaces/http"
 )
+
+// @title voc-go-backend 接口文档
+// @version 1.0
+// @description VOC 平台 Go 后端接口文档，涵盖认证、系统管理、日志等模块。
+// @BasePath /
+// @schemes http
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 func main() {
 	// 1. 初始化数据库连接（PostgreSQL）
@@ -146,8 +158,14 @@ func main() {
 	fileRoot := getenvDefault("FILE_STORAGE_DIR", "./data/file")
 	r.Static("/file", fileRoot)
 
+	// Swagger 接口文档
+	// 访问地址示例：http://localhost:4398/swagger/index.html
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// 5. 启动 HTTP 服务
 	port := getenvDefault("HTTP_PORT", "4398")
+	// 在启动前设置 swagger 文档的 Host，便于在 UI 中调试。
+	docs.SwaggerInfo.Host = "localhost:" + port
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("failed to start http server: %v", err)
 	}

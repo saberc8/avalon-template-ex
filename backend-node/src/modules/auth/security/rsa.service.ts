@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 /**
- * RSA 解密服务，采用与 Python 版本相同的 PKCS#1 v1.5 手工解密方式。
- * 这里直接使用大数运算，兼容 512 位密钥。
+ * RSA 解密服务，使用手写 BigInt 运算实现 PKCS#1 v1.5 解密，
+ * 兼容当前 Node 版本对 RSA_PKCS1_PADDING 的限制。
+ *
+ * 说明：
+ * - 私钥来源于 AUTH_RSA_PRIVATE_KEY 环境变量，未配置时回落到默认值（与 Java dev 配置一致）。
+ * - 私钥格式为 PKCS#8（Base64 编码），内部从 ASN.1 序列中提取 n（模数）与 d（私钥指数）。
  */
 @Injectable()
 export class RSADecryptor {
@@ -17,9 +21,6 @@ export class RSADecryptor {
       throw new Error('AUTH_RSA_PRIVATE_KEY 未配置');
     }
     const der = Buffer.from(keyB64, 'base64');
-    // 使用最简单的 ASN.1 解析方式：假定为 PKCS#8 私钥，仅提取 n 与 d。
-    // 为避免引入重量级依赖，这里采用非常简化的解析逻辑：
-    // 先查找 0x02（INTEGER）序列，第二个 INTEGER 为 n，第五个 INTEGER 为 d。
     const ints: bigint[] = [];
     for (let i = 0; i < der.length; ) {
       if (der[i] !== 0x02) {
@@ -41,7 +42,6 @@ export class RSADecryptor {
         offset = i + 2;
       }
       const intBytes = der.slice(offset, offset + len);
-      // 去掉前导 0
       let start = 0;
       while (start < intBytes.length && intBytes[start] === 0) {
         start++;
@@ -52,15 +52,14 @@ export class RSADecryptor {
       }
       ints.push(value);
       i = offset + len;
-      if (ints.length >= 6) break;
     }
-    if (ints.length < 6) {
+    // 对于当前 PKCS#8 结构，整数顺序大致为：
+    // [0]=version, [1]=0, [2]=n, [3]=e, [4]=d, ...
+    if (ints.length < 5) {
       throw new Error('RSA 私钥解析失败');
     }
-    // 对于 PKCS#8 PrivateKeyInfo，整数顺序通常为：
-    // 0: version, 1: n, 2: e, 3: d, 4: p, 5: q ...
-    this.n = ints[1];
-    this.d = ints[3];
+    this.n = ints[2];
+    this.d = ints[4];
   }
 
   /**
@@ -75,9 +74,7 @@ export class RSADecryptor {
     return plainBytes.toString('utf8');
   }
 
-  /**
-   * PKCS#1 v1.5 低强度解密实现，与 Python/Go 版对齐。
-   */
+  /** PKCS#1 v1.5 解密实现。 */
   private decryptPkcs1v15(cipher: Buffer): Buffer {
     const k = this.byteLengthOfN();
     if (cipher.length !== k) {

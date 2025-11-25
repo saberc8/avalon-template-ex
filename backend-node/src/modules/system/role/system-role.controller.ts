@@ -207,9 +207,8 @@ WHERE r.id = ${BigInt(id)};
     const now = new Date();
     const newId = nextId();
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `
 INSERT INTO sys_role (
@@ -238,7 +237,8 @@ VALUES ($1, $2, $3, $4, $5, $6,
             BigInt(did),
           ),
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '新增角色失败');
     }
@@ -271,9 +271,8 @@ VALUES ($1, $2, $3, $4, $5, $6,
     const deptCheckStrict = body.deptCheckStrictly ?? true;
     const now = new Date();
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `
 UPDATE sys_role
@@ -306,7 +305,8 @@ UPDATE sys_role
             BigInt(did),
           ),
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '修改角色失败');
     }
@@ -326,9 +326,8 @@ UPDATE sys_role
     }
     const idsBig = ids.map((v) => BigInt(v));
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `DELETE FROM sys_user_role WHERE role_id = ANY($1::bigint[])`,
           idsBig,
@@ -345,7 +344,8 @@ UPDATE sys_role
           `DELETE FROM sys_role WHERE id = ANY($1::bigint[])`,
           idsBig,
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '删除角色失败');
     }
@@ -368,9 +368,8 @@ UPDATE sys_role
       return fail('400', 'ID 参数不正确');
     }
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `DELETE FROM sys_role_menu WHERE role_id = $1`,
           BigInt(id),
@@ -395,7 +394,8 @@ UPDATE sys_role
           new Date(),
           BigInt(id),
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '保存角色权限失败');
     }
@@ -618,4 +618,3 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
     return ok(ids);
   }
 }
-

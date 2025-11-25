@@ -4,13 +4,22 @@ import { AuthService } from './auth.service';
 import { RSADecryptor } from './security/rsa.service';
 import { PasswordService } from './security/password.service';
 import { TokenService } from './jwt/jwt.service';
+import { OnlineStoreService } from './online.store';
+import { OnlineUserController } from './online.controller';
+import { OptionService } from '../../shared/option/option.service';
 
 /**
- * 认证模块，聚合登录/当前用户相关能力。
+ * 认证模块，聚合登录/当前用户与在线用户相关能力。
  */
 @Module({
-  controllers: [AuthController],
-  providers: [AuthService, RSADecryptor, PasswordService, TokenService],
+  controllers: [AuthController, OnlineUserController],
+  providers: [
+    AuthService,
+    RSADecryptor,
+    PasswordService,
+    TokenService,
+    OnlineStoreService,
+    OptionService,
+  ],
 })
 export class AuthModule {}
-

@@ -7,6 +7,8 @@ import { SystemUserController } from './user/system-user.controller';
 import { SystemRoleController } from './role/system-role.controller';
 import { SystemMenuController } from './menu/system-menu.controller';
 import { SystemDeptController } from './dept/system-dept.controller';
+import { SystemDictController } from './dict/system-dict.controller';
+import { SystemOptionController } from './option/system-option.controller';
 
 /**
  * 系统管理模块，聚合用户、角色、菜单、部门等 /system/* 接口，
@@ -18,8 +20,9 @@ import { SystemDeptController } from './dept/system-dept.controller';
     SystemRoleController,
     SystemMenuController,
     SystemDeptController,
+    SystemDictController,
+    SystemOptionController,
   ],
   providers: [PrismaService, TokenService, RSADecryptor, PasswordService],
 })
 export class SystemModule {}
-

@@ -19,6 +19,14 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty({ message: '密码不能为空' })
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  captcha?: string;
+
+  @IsOptional()
+  @IsString()
+  uuid?: string;
 }
 
 /**
@@ -26,5 +34,7 @@ export class LoginDto {
  */
 export interface LoginResp {
   token: string;
+  userId: number;
+  username: string;
+  nickname: string;
 }
-

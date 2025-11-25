@@ -446,9 +446,8 @@ UPDATE sys_menu
     }
     const allIds = Array.from(seen);
 
-    const tx = this.prisma.$transaction;
     try {
-      await tx([
+      const statements = [
         this.prisma.$executeRawUnsafe(
           `DELETE FROM sys_role_menu WHERE menu_id = ANY($1::bigint[])`,
           allIds.map((v) => BigInt(v)),
@@ -457,7 +456,8 @@ UPDATE sys_menu
           `DELETE FROM sys_menu WHERE id = ANY($1::bigint[])`,
           allIds.map((v) => BigInt(v)),
         ),
-      ]);
+      ];
+      await (this.prisma as any).$transaction(statements as any);
     } catch {
       return fail('500', '删除菜单失败');
     }
@@ -471,4 +471,3 @@ UPDATE sys_menu
     return ok(true);
   }
 }
-

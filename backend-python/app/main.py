@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from .routers import auth, captcha, common, system_user
+from .routers import auth, captcha, common, system_user, system_role
 
 
 def create_app() -> FastAPI:
@@ -12,9 +12,9 @@ def create_app() -> FastAPI:
     app.include_router(captcha.router)
     app.include_router(common.router)
     app.include_router(system_user.router)
+    app.include_router(system_role.router)
 
     return app
 
 
 app = create_app()
-
