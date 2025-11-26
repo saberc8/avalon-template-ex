@@ -4,7 +4,7 @@
 
 多端一体的后台管理系统示例仓库，包含多种后端实现（Java / Go / Node / Python）与多端前端（PC 管理端、H5、App 等），便于对比学习和本地联调。
 
-如果只想快速跑通一个组合，推荐：`backend-python` + `pc-admin-vue3`。更详细的启动说明可以参考根目录的 `README-startup.md`。
+如果只想快速跑通一个组合，推荐：`backend-go` + `pc-admin-vue3`。更详细的启动说明可以参考根目录的 `README-startup.md`。
 
 ---
 
