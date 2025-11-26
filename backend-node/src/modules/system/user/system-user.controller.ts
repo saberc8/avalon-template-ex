@@ -11,6 +11,7 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
@@ -31,6 +32,7 @@ import {
   UserImportResultResp,
 } from './dto';
 import { nextId } from '../../../shared/id/id';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 /**
  * 用户管理接口集合，路径前缀 /system/user*。
@@ -414,7 +416,9 @@ WHERE u.id = ${BigInt(id)};
   async createUser(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: SystemUserReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -504,7 +508,25 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
         ),
       ];
       await (this.prisma as any).$transaction(statements as any);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '用户管理',
+        description: `新增用户[${nickname}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '用户管理',
+        description: `新增用户[${nickname}]`,
+        success: false,
+        message: '新增用户失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增用户失败');
     }
 
@@ -517,7 +539,9 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: SystemUserReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -695,15 +719,43 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
       console.error('updateUser error:', e);
       const msg =
         (e && (e.message || (typeof e === 'string' ? e : ''))) || '修改用户失败';
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '用户管理',
+        description: `修改用户[${existing.nickname || existing.username}]`,
+        success: false,
+        message: msg,
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', `修改用户失败：${msg}`);
     }
+
+    await writeOperationLog(this.prisma, {
+      req,
+      userId: currentUserId,
+      module: '用户管理',
+      description: `修改用户[${existing.nickname || existing.username}]`,
+      success: true,
+      message: '',
+      timeTakenMs: Date.now() - begin,
+    });
 
     return ok(true);
   }
 
   /** 删除用户：DELETE /system/user */
   @Delete('/system/user')
-  async deleteUser(@Body() body: IdsRequest) {
+  async deleteUser(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: IdsRequest,
+    @Req() req: any,
+  ) {
+    const begin = Date.now();
+    const currentUserId = this.currentUserId(authorization);
+    if (!currentUserId) {
+      return fail('401', '未授权，请重新登录');
+    }
     if (!body?.ids?.length) {
       return fail('400', 'ID 列表不能为空');
     }
@@ -726,8 +778,26 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
       ];
       await (this.prisma as any).$transaction(statements as any);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '用户管理',
+        description: '删除用户',
+        success: false,
+        message: '删除用户失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除用户失败');
     }
+    await writeOperationLog(this.prisma, {
+      req,
+      userId: currentUserId,
+      module: '用户管理',
+      description: '删除用户',
+      success: true,
+      message: '',
+      timeTakenMs: Date.now() - begin,
+    });
     return ok(true);
   }
 
@@ -737,7 +807,9 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: SystemUserPasswordResetReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -796,8 +868,27 @@ UPDATE sys_user
         BigInt(id),
       );
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '用户管理',
+        description: `重置密码[${id}]`,
+        success: false,
+        message: '重置密码失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '重置密码失败');
     }
+
+    await writeOperationLog(this.prisma, {
+      req,
+      userId: currentUserId,
+      module: '用户管理',
+      description: `重置密码[${id}]`,
+      success: true,
+      message: '',
+      timeTakenMs: Date.now() - begin,
+    });
 
     return ok(true);
   }
@@ -808,7 +899,9 @@ UPDATE sys_user
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: SystemUserRoleUpdateReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -840,8 +933,27 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
       ];
       await (this.prisma as any).$transaction(statements as any);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '用户管理',
+        description: `分配角色[用户ID=${id}]`,
+        success: false,
+        message: '分配角色失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '分配角色失败');
     }
+
+    await writeOperationLog(this.prisma, {
+      req,
+      userId: currentUserId,
+      module: '用户管理',
+      description: `分配角色[用户ID=${id}]`,
+      success: true,
+      message: '',
+      timeTakenMs: Date.now() - begin,
+    });
 
     return ok(true);
   }

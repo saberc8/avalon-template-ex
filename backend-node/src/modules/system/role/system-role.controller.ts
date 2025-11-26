@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
@@ -22,6 +23,7 @@ import {
   RoleResp,
   RoleUserResp,
 } from './dto';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 interface IdsRequest {
   ids: number[];
@@ -190,7 +192,9 @@ WHERE r.id = ${BigInt(id)};
   async createRole(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: RoleReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -239,7 +243,25 @@ VALUES ($1, $2, $3, $4, $5, $6,
         ),
       ];
       await (this.prisma as any).$transaction(statements as any);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: `新增角色[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: `新增角色[${name}]`,
+        success: false,
+        message: '新增角色失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增角色失败');
     }
 
@@ -252,7 +274,9 @@ VALUES ($1, $2, $3, $4, $5, $6,
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: RoleReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -307,7 +331,25 @@ UPDATE sys_role
         ),
       ];
       await (this.prisma as any).$transaction(statements as any);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: `修改角色[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: `修改角色[${name}]`,
+        success: false,
+        message: '修改角色失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改角色失败');
     }
 
@@ -316,7 +358,16 @@ UPDATE sys_role
 
   /** DELETE /system/role */
   @Delete('/system/role')
-  async deleteRole(@Body() body: IdsRequest) {
+  async deleteRole(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: IdsRequest,
+    @Req() req: any,
+  ) {
+    const begin = Date.now();
+    const currentUserId = this.currentUserId(authorization);
+    if (!currentUserId) {
+      return fail('401', '未授权，请重新登录');
+    }
     if (!body?.ids?.length) {
       return fail('400', 'ID 列表不能为空');
     }
@@ -346,7 +397,25 @@ UPDATE sys_role
         ),
       ];
       await (this.prisma as any).$transaction(statements as any);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: '删除角色',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: '删除角色',
+        success: false,
+        message: '删除角色失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除角色失败');
     }
     return ok(true);
@@ -358,7 +427,9 @@ UPDATE sys_role
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: RolePermissionReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -396,7 +467,25 @@ UPDATE sys_role
         ),
       ];
       await (this.prisma as any).$transaction(statements as any);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: `保存角色权限[角色ID=${id}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '角色管理',
+        description: `保存角色权限[角色ID=${id}]`,
+        success: false,
+        message: '保存角色权限失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '保存角色权限失败');
     }
 

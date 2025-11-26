@@ -6,12 +6,14 @@ import {
   Patch,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
 import { TokenService } from '../../auth/jwt/jwt.service';
 import { OptionResetReq, OptionResp, OptionUpdateItem } from './dto';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 /**
  * 系统配置控制器，复刻 Java/Go `/system/option*` 行为。
@@ -92,7 +94,9 @@ ORDER BY id ASC;
   async updateOption(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: OptionUpdateItem[],
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -131,8 +135,26 @@ UPDATE sys_option
 
     try {
       await this.prisma.$transaction(statements);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '系统配置',
+        description: '批量保存系统配置',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '系统配置',
+        description: '批量保存系统配置',
+        success: false,
+        message: '保存系统配置失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '保存系统配置失败');
     }
   }
@@ -144,7 +166,9 @@ UPDATE sys_option
   async resetOptionValue(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: OptionResetReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -175,8 +199,26 @@ UPDATE sys_option
 
     try {
       await this.prisma.$executeRawUnsafe(stmt, ...args);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '系统配置',
+        description: '恢复系统配置默认值',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '系统配置',
+        description: '恢复系统配置默认值',
+        success: false,
+        message: '恢复默认配置失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '恢复默认配置失败');
     }
   }

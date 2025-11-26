@@ -11,6 +11,7 @@ use Voc\Admin\Infrastructure\Security\TokenService;
 use Voc\Admin\Application\Auth\AuthService;
 use Voc\Admin\Interfaces\Http\AuthRoutes;
 use Voc\Admin\Interfaces\Http\UserRoutes;
+use Voc\Admin\Interfaces\Http\UserProfileRoutes;
 use Voc\Admin\Interfaces\Http\SystemUserRoutes;
 use Voc\Admin\Interfaces\Http\CommonRoutes;
 use Voc\Admin\Interfaces\Http\DictRoutes;
@@ -79,6 +80,9 @@ $authService = new AuthService($db, $rsaDecryptor, $passwordService, $tokenServi
 
 // 用户与路由相关接口（/auth/user/info、/auth/user/route）
 (new UserRoutes($db, $tokenService, $responder))->register($app);
+
+// 个人信息相关接口：/user/profile/*
+(new UserProfileRoutes($db, $tokenService, $rsaDecryptor, $passwordService, $responder))->register($app);
 
 // 系统管理：用户管理 /system/user
 (new SystemUserRoutes($db, $tokenService, $rsaDecryptor, $passwordService, $responder))->register($app);

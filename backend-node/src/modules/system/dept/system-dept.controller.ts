@@ -8,11 +8,13 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
 import { TokenService } from '../../auth/jwt/jwt.service';
 import { DeptReq, DeptResp, DeptTreeQuery, DeleteDeptReq } from './dto';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 /**
  * 部门管理接口集合，对齐 /system/dept*。
@@ -195,7 +197,9 @@ WHERE d.id = ${BigInt(id)};
   async createDept(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: DeptReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const name = (body.name ?? '').trim();
     if (!name) {
       return fail('400', '名称不能为空');
@@ -259,7 +263,25 @@ INSERT INTO sys_dept (
         BigInt(currentUserId),
         now,
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '部门管理',
+        description: `新增部门[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '部门管理',
+        description: `新增部门[${name}]`,
+        success: false,
+        message: '新增部门失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增部门失败');
     }
 
@@ -272,7 +294,9 @@ INSERT INTO sys_dept (
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: DeptReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const id = Number(idParam);
     if (!Number.isFinite(id) || id <= 0) {
       return fail('400', '无效的部门 ID');
@@ -363,7 +387,25 @@ UPDATE sys_dept
         new Date(),
         BigInt(id),
       );
+      // 部门修改成功后记录操作日志，便于在系统日志中审计该操作。
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        description: `修改部门[${old.name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      // 记录失败操作日志，但不再抛出二次异常。
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        description: `修改部门[${old.name}]`,
+        success: false,
+        message: '修改部门失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改部门失败');
     }
 
@@ -372,7 +414,12 @@ UPDATE sys_dept
 
   /** DELETE /system/dept */
   @Delete('/system/dept')
-  async deleteDept(@Body() body: DeleteDeptReq) {
+  async deleteDept(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: DeleteDeptReq,
+    @Req() req: any,
+  ) {
+    const begin = Date.now();
     if (!body?.ids?.length) {
       return fail('400', '参数错误');
     }
@@ -381,6 +428,7 @@ UPDATE sys_dept
       return fail('400', '参数错误');
     }
     const idsBig = ids.map((v) => BigInt(v));
+    const currentUserId = this.currentUserId(authorization);
 
     // 1. 系统内置校验
     const sysRows = await this.prisma.$queryRaw<
@@ -436,6 +484,16 @@ SELECT EXISTS(
       `DELETE FROM sys_dept WHERE id = ANY($1::bigint[])`,
       idsBig,
     );
+
+    await writeOperationLog(this.prisma, {
+      req,
+      userId: currentUserId,
+      module: '部门管理',
+      description: '删除部门',
+      success: true,
+      message: '',
+      timeTakenMs: Date.now() - begin,
+    });
 
     return ok(true);
   }
@@ -523,4 +581,3 @@ ORDER BY d.sort ASC, d.id ASC;
     return lines.join('\n');
   }
 }
-

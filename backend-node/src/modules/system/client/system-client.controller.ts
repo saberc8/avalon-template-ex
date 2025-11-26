@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
 import { PageResult, IdsRequest } from '../user/dto';
 import { TokenService } from '../../auth/jwt/jwt.service';
 import { nextId } from '../../../shared/id/id';
 import { ClientResp, ClientDetailResp, ClientQuery, ClientReq } from './dto';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 /**
  * 客户端配置管理接口集合，实现 /system/client 系列接口，
@@ -220,7 +221,9 @@ WHERE c.id = ${BigInt(id)};
   async createClient(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: ClientReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -266,7 +269,25 @@ INSERT INTO sys_client (
         BigInt(currentUserId),
         now,
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '客户端管理',
+        description: `新增客户端[${clientID}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '客户端管理',
+        description: `新增客户端[${clientID}]`,
+        success: false,
+        message: '新增客户端失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增客户端失败');
     }
 
@@ -279,7 +300,9 @@ INSERT INTO sys_client (
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: ClientReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -324,7 +347,25 @@ UPDATE sys_client
         new Date(),
         BigInt(id),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '客户端管理',
+        description: `修改客户端[ID=${id}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '客户端管理',
+        description: `修改客户端[ID=${id}]`,
+        success: false,
+        message: '修改客户端失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改客户端失败');
     }
 
@@ -336,7 +377,9 @@ UPDATE sys_client
   async deleteClient(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: IdsRequest,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -354,11 +397,28 @@ UPDATE sys_client
         `DELETE FROM sys_client WHERE id = ANY($1::bigint[]);`,
         ids.map((v) => BigInt(v)),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '客户端管理',
+        description: '删除客户端',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '客户端管理',
+        description: '删除客户端',
+        success: false,
+        message: '删除客户端失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除客户端失败');
     }
 
     return ok(true);
   }
 }
-

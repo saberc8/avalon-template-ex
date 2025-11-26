@@ -612,3 +612,4 @@
   - `.gitignore` 为纯配置文件，未执行额外命令；后续需在本地确认不影响既有必要文件的提交。
   - `README-startup.md` 为纯文档更新，未对现有代码与配置造成影响。 
 [2025-11-26 10:13:43] 完成 PHP /common、/system/option、/system/dict 路由迁移，已对齐 Java/Node 接口。
+[2025-11-26 12:40:12] PHP: 新增 UserProfileRoutes，实现 /user/profile/avatar/basic.info/password/phone/email/social 接口，对齐 Java 前端约定。

@@ -7,11 +7,13 @@ import {
   Param,
   Post,
   Put,
+  Req,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
 import { TokenService } from '../../auth/jwt/jwt.service';
 import { MenuReq, MenuResp, IdsRequest } from './dto';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 /**
  * 菜单管理接口集合，兼容前端 /system/menu* 请求。
@@ -214,7 +216,9 @@ WHERE m.id = ${BigInt(id)};
   async createMenu(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: MenuReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -293,7 +297,25 @@ VALUES (
         BigInt(currentUserId),
         now,
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '菜单管理',
+        description: `新增菜单[${title}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '菜单管理',
+        description: `新增菜单[${title}]`,
+        success: false,
+        message: '新增菜单失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增菜单失败');
     }
 
@@ -306,7 +328,9 @@ VALUES (
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: MenuReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -394,7 +418,25 @@ UPDATE sys_menu
         new Date(),
         BigInt(id),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '菜单管理',
+        description: `修改菜单[${title}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '菜单管理',
+        description: `修改菜单[${title}]`,
+        success: false,
+        message: '修改菜单失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改菜单失败');
     }
 
@@ -406,7 +448,9 @@ UPDATE sys_menu
   async deleteMenu(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: IdsRequest,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -458,7 +502,25 @@ UPDATE sys_menu
         ),
       ];
       await (this.prisma as any).$transaction(statements as any);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '菜单管理',
+        description: '删除菜单',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '菜单管理',
+        description: '删除菜单',
+        success: false,
+        message: '删除菜单失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除菜单失败');
     }
 

@@ -8,11 +8,13 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
 import { TokenService } from '../../auth/jwt/jwt.service';
 import { nextId } from '../../../shared/id/id';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 import {
   DictItemListQuery,
   DictItemReq,
@@ -281,7 +283,9 @@ WHERE di.id = ${BigInt(id)};
   async createDictItem(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: DictItemReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -326,8 +330,26 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
         BigInt(currentUserId),
         new Date(),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `新增字典项[${label}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `新增字典项[${label}]`,
+        success: false,
+        message: '新增字典项失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增字典项失败');
     }
   }
@@ -338,7 +360,9 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: DictItemReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -404,8 +428,26 @@ UPDATE sys_dict_item
         new Date(),
         BigInt(id),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `修改字典项[${label}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `修改字典项[${label}]`,
+        success: false,
+        message: '修改字典项失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改字典项失败');
     }
   }
@@ -415,7 +457,9 @@ UPDATE sys_dict_item
   async deleteDictItem(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: IdsRequest,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -442,8 +486,26 @@ UPDATE sys_dict_item
 
     try {
       await this.prisma.$transaction(statements);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: '删除字典项',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: '删除字典项',
+        success: false,
+        message: '删除字典项失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除字典项失败');
     }
   }
@@ -509,7 +571,9 @@ WHERE d.id = ${BigInt(id)};
   async createDict(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: DictReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -552,8 +616,26 @@ VALUES ($1, $2, $3, $4, FALSE, $5, $6);
         BigInt(currentUserId),
         now,
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `新增字典[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok({ id: Number(newId) });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `新增字典[${name}]`,
+        success: false,
+        message: '新增字典失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增字典失败');
     }
   }
@@ -564,7 +646,9 @@ VALUES ($1, $2, $3, $4, FALSE, $5, $6);
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: DictReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -593,8 +677,26 @@ UPDATE sys_dict
         new Date(),
         BigInt(id),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `修改字典[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: `修改字典[${name}]`,
+        success: false,
+        message: '修改字典失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改字典失败');
     }
   }
@@ -604,7 +706,9 @@ UPDATE sys_dict
   async deleteDict(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: IdsRequest,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -655,8 +759,26 @@ WHERE id = ANY(${ids as any}::bigint[]);
 
     try {
       await this.prisma.$transaction(statements);
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: '删除字典',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
       return ok(true);
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '字典管理',
+        description: '删除字典',
+        success: false,
+        message: '删除字典失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除字典失败');
     }
   }

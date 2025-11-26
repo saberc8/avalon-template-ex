@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ok, fail } from '../../../shared/api-response/api-response';
 import { StorageResp, StorageQuery, StorageStatusUpdateReq, StorageReq } from './dto';
 import { IdsRequest } from '../user/dto';
 import { nextId } from '../../../shared/id/id';
 import { TokenService } from '../../auth/jwt/jwt.service';
+import { writeOperationLog } from '../../../shared/log/operation-log';
 
 /**
  * 存储配置管理接口集合，实现 /system/storage 系列接口中的列表查询，
@@ -132,7 +133,9 @@ ORDER BY s.sort ASC, s.id ASC;
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: StorageStatusUpdateReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -172,7 +175,25 @@ UPDATE sys_storage
         new Date(),
         BigInt(id),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `修改存储状态[ID=${id}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `修改存储状态[ID=${id}]`,
+        success: false,
+        message: '更新存储状态失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '更新存储状态失败');
     }
 
@@ -184,7 +205,9 @@ UPDATE sys_storage
   async setDefault(
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -210,7 +233,25 @@ UPDATE sys_storage
         new Date(),
         BigInt(id),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `设为默认存储[ID=${id}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `设为默认存储[ID=${id}]`,
+        success: false,
+        message: '设为默认存储失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '设为默认存储失败');
     }
 
@@ -303,7 +344,9 @@ WHERE s.id = ${BigInt(id)};
   async createStorage(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: StorageReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -377,7 +420,25 @@ INSERT INTO sys_storage (
         BigInt(currentUserId),
         now,
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `新增存储配置[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `新增存储配置[${name}]`,
+        success: false,
+        message: '新增存储配置失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '新增存储配置失败');
     }
 
@@ -390,7 +451,9 @@ INSERT INTO sys_storage (
     @Headers('authorization') authorization: string | undefined,
     @Param('id') idParam: string,
     @Body() body: StorageReq,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -502,7 +565,25 @@ UPDATE sys_storage
           BigInt(id),
         );
       }
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `修改存储配置[${name}]`,
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: `修改存储配置[${name}]`,
+        success: false,
+        message: '修改存储配置失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '修改存储配置失败');
     }
 
@@ -514,7 +595,9 @@ UPDATE sys_storage
   async deleteStorage(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: IdsRequest,
+    @Req() req: any,
   ) {
+    const begin = Date.now();
     const currentUserId = this.currentUserId(authorization);
     if (!currentUserId) {
       return fail('401', '未授权，请重新登录');
@@ -542,7 +625,25 @@ UPDATE sys_storage
         `DELETE FROM sys_storage WHERE id = ANY($1::bigint[]);`,
         ids.map((v) => BigInt(v)),
       );
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: '删除存储配置',
+        success: true,
+        message: '',
+        timeTakenMs: Date.now() - begin,
+      });
     } catch {
+      await writeOperationLog(this.prisma, {
+        req,
+        userId: currentUserId,
+        module: '存储配置',
+        description: '删除存储配置',
+        success: false,
+        message: '删除存储配置失败',
+        timeTakenMs: Date.now() - begin,
+      });
       return fail('500', '删除存储配置失败');
     }
 

@@ -193,6 +193,78 @@
     - 携带时间范围与 module=登录 访问 `/system/log` 不再返回 500；
     - 列表与详情中的耗时、状态码与状态字段值正确展示。
 
+### 2025-11-26（Codex）backend-node 部门修改操作日志写入测试记录
+
+- 测试命令：
+  - 在 `backend-node` 目录执行：`npm test`
+- 实际输出：
+  - 同前，`test` 脚本仍为 `echo \"no tests yet\" && exit 0`，命令本身可正常执行，但未包含针对部门模块与系统日志模块的自动化用例。
+- 变更影响范围（静态验证）：
+  - `backend-node/src/modules/system/dept/system-dept.controller.ts`：
+    - 在 `updateDept` 方法中注入 `@Req() req`，记录开始时间 `begin`，在更新成功与失败的分支中分别调用 `writeDeptLog` 写入 sys_log。
+    - 新增私有方法 `writeDeptLog`，复用 `nextId()` 生成日志 ID，模块固定为“部门管理”，描述为“修改部门[...]”，同时记录 URL、请求方式、请求头、IP、User-Agent、耗时（ms）与状态（成功/失败），`time_taken` 字段仍以 BigInt 形式写入，列表/详情查询时会被转换为 number。
+- 风险评估：
+  - 日志写入逻辑位于部门修改流程的 try/catch 内部，写入失败会被静默忽略，不影响原有部门修改业务。
+  - 由于未在本地连接数据库并实际发起 HTTP 请求，目前仅能从 SQL 与类型映射上静态确认行为，建议在联调环境中对“修改部门名称后在系统日志中是否出现一条模块为‘部门管理’、描述为‘修改部门[...]’的记录”进行人工验证。
+
+### 2025-11-26（Codex）backend-node 通用系统操作日志接入测试记录
+
+- 测试命令：
+  - 在 `backend-node` 目录执行：`npm test`
+- 实际输出：
+  - 当前依旧为占位测试脚本（`echo "no tests yet" && exit 0`），仅用于验证 Node 项目可正常运行，无针对操作日志的自动化用例。
+- 变更范围（静态验证）：
+  - 新增通用日志写入工具：
+    - `backend-node/src/shared/log/operation-log.ts`：提供 `writeOperationLog(prisma, params)`，统一将操作信息写入 `sys_log`，字段结构与登录日志保持一致（`module`、`description`、`status_code`、`status`、`time_taken`、`ip`、`browser` 等）。
+  - 在各系统管理控制器中接入操作日志：
+    - 用户管理 `SystemUserController`：
+      - `POST /system/user` 新增用户；
+      - `PUT /system/user/:id` 修改用户；
+      - `DELETE /system/user` 删除用户；
+      - `PATCH /system/user/:id/password` 重置密码；
+      - `PATCH /system/user/:id/role` 分配角色。
+      - 模块统一为“用户管理”，描述形如“新增用户[...]”“修改用户[...]”“删除用户”“重置密码[ID=...]”“分配角色[用户ID=...]”。
+    - 角色管理 `SystemRoleController`：
+      - `POST /system/role` 新增角色；
+      - `PUT /system/role/:id` 修改角色；
+      - `DELETE /system/role` 删除角色；
+      - `PUT /system/role/:id/permission` 保存角色权限。
+      - 模块统一为“角色管理”，描述形如“新增角色[...]”“修改角色[...]”“删除角色”“保存角色权限[角色ID=...]”。
+    - 菜单管理 `SystemMenuController`：
+      - `POST /system/menu` 新增菜单；
+      - `PUT /system/menu/:id` 修改菜单；
+      - `DELETE /system/menu` 删除菜单。
+      - 模块统一为“菜单管理”，描述形如“新增菜单[...]”“修改菜单[...]”“删除菜单”。
+    - 部门管理 `SystemDeptController`：
+      - `POST /system/dept` 新增部门；
+      - `PUT /system/dept/:id` 修改部门；
+      - `DELETE /system/dept` 删除部门。
+      - 模块统一为“部门管理”，描述形如“新增部门[...]”“修改部门[...]”“删除部门”。
+    - 字典管理 `SystemDictController`：
+      - 字典项：`POST /system/dict/item` 新增、`PUT /system/dict/item/:id` 修改、`DELETE /system/dict/item` 删除；
+      - 字典：`POST /system/dict` 新增、`PUT /system/dict/:id` 修改、`DELETE /system/dict` 删除。
+      - 模块统一为“字典管理”，描述对应“新增/修改/删除字典[项]”。
+    - 系统配置 `SystemOptionController`：
+      - `PUT /system/option` 批量保存系统配置；
+      - `PATCH /system/option/value` 按类别或编码恢复默认值。
+      - 模块统一为“系统配置”，描述为“批量保存系统配置”“恢复系统配置默认值”。
+    - 存储配置 `SystemStorageController`：
+      - `PUT /system/storage/:id/status` 修改存储状态；
+      - `PUT /system/storage/:id/default` 设为默认存储；
+      - `POST /system/storage` 新增存储配置；
+      - `PUT /system/storage/:id` 修改存储配置；
+      - `DELETE /system/storage` 删除存储配置。
+      - 模块统一为“存储配置”，描述为“修改存储状态[...]”“设为默认存储[...]”“新增/修改/删除存储配置”。
+    - 客户端管理 `SystemClientController`：
+      - `POST /system/client` 新增客户端；
+      - `PUT /system/client/:id` 修改客户端；
+      - `DELETE /system/client` 删除客户端。
+      - 模块统一为“客户端管理”，描述为“新增/修改/删除客户端[...]”。
+- 风险评估：
+  - 所有日志写入均包裹在 try/catch 中，失败时静默忽略，不影响原有业务接口成功与否，只会导致对应操作在“系统日志”页面缺失记录。
+  - 日志记录使用 `BigInt` 保存耗时与用户 ID，查询接口侧已经统一转换为 `Number(...)`，不会再触发 BigInt 序列化错误。
+  - 当前尚未对文件管理 `/system/file*` 的上传/删除等操作接入操作日志（仅登录与上述管理模块），如需对文件操作进行审计，可按本次模式补充。
+
 ## 2025-11-20（Codex）backend-php /system 核心模块迁移记录
 
 - 本次新增 PHP 实现的接口：
