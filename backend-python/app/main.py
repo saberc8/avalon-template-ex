@@ -1,6 +1,17 @@
 from fastapi import FastAPI
 
-from .routers import auth, captcha, common, system_user, system_role
+from .routers import (
+    auth,
+    captcha,
+    common,
+    monitor_online,
+    system_dict,
+    system_dept,
+    system_option,
+    system_menu,
+    system_role,
+    system_user,
+)
 
 
 def create_app() -> FastAPI:
@@ -13,6 +24,10 @@ def create_app() -> FastAPI:
     app.include_router(common.router)
     app.include_router(system_user.router)
     app.include_router(system_role.router)
+    app.include_router(system_menu.router)
+    app.include_router(system_dept.router)
+    app.include_router(system_option.router)
+    app.include_router(monitor_online.router)
 
     return app
 

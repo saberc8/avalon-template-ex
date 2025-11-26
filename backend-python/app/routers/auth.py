@@ -1,13 +1,14 @@
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 
 from ..api_response import fail, ok
 from ..config import get_settings
 from ..db import get_db_cursor
 from ..models.auth import LoginRequest, LoginResponse, RouteItem, UserInfo
 from ..security.jwt_token import TokenClaims, TokenService
+from ..security.online_store import get_online_store
 from ..security.password import PasswordVerifier
 from ..security.rsa import RSADecryptor
 
@@ -38,6 +39,7 @@ def login(
     req: LoginRequest,
     token_svc: TokenService = Depends(get_token_service),
     decryptor: RSADecryptor = Depends(get_rsa_decryptor),
+    request: Request | None = None,
 ):
     """账号密码登录，保持与 Java/Go 逻辑一致。"""
     auth_type = (req.authType or "").strip().upper()
@@ -100,9 +102,68 @@ LIMIT 1;
     if row["status"] != 1:
         return fail("400", "此账号已被禁用，如有疑问，请联系管理员")
 
-    token = token_svc.generate(int(row["id"]))
+    user_id = int(row["id"])
+    username = row["username"]
+    nickname = row["nickname"]
+
+    token = token_svc.generate(user_id)
+
+    # 记录在线用户信息，兼容 /monitor/online。
+    ip_header = ""
+    user_agent = ""
+    if request is not None:
+        ip_header = request.headers.get("x-forwarded-for", "") or ""
+        user_agent = request.headers.get("user-agent", "") or ""
+
+    real_ip = ""
+    if ip_header:
+        real_ip = (ip_header.split(",")[0] or "").strip()
+    if not real_ip and request is not None and request.client:
+        real_ip = request.client.host or ""
+
+    store = get_online_store()
+    store.record_login(
+        user_id=user_id,
+        username=username,
+        nickname=nickname,
+        client_id=req.clientId,
+        token=token,
+        ip=real_ip,
+        user_agent=user_agent,
+    )
+
     resp = LoginResponse(token=token)
     return ok(resp.dict())
+
+
+@router.post("/auth/logout")
+def logout(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    token_svc: TokenService = Depends(get_token_service),
+):
+    """
+    登出接口：POST /auth/logout。
+
+    行为说明：
+    - 解析当前请求的 Token，若无效则返回未授权；
+    - 从在线用户存储中移除当前 token；
+    - 返回当前登录用户 ID，兼容 Java/Node 版本。
+    """
+    claims = parse_token(authorization, token_svc)
+    if not claims:
+        return fail("401", "未授权，请重新登录")
+
+    authz = (authorization or "").strip()
+    raw_token = authz
+    lower = raw_token.lower()
+    if lower.startswith("bearer "):
+        raw_token = raw_token[7:].strip()
+
+    if raw_token:
+        store = get_online_store()
+        store.remove_by_token(raw_token)
+
+    return ok(claims.user_id)
 
 
 @router.get("/auth/user/info")
@@ -326,5 +387,4 @@ WHERE rm.role_id = ANY(%s);
 
     # 返回 Pydantic 可序列化结构
     return ok([r.dict() for r in roots])
-
 

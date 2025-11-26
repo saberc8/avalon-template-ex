@@ -1,0 +1,54 @@
+# 通用
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Node / 前端
+node_modules/
+dist/
+build/
+.cache/
+.next/
+.nuxt/
+.turbo/
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Go
+bin/
+*.out
+
+# Rust
+target/
+
+# Java / Maven / IDE
+*.class
+*.jar
+*.war
+*.ear
+target/
+.idea/
+*.iml
+.project
+.settings/
+.classpath
+
+# 日志与运行时文件
+logs/
+*.sqlite
+*.db
+
+# 其他工具
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+

@@ -9,6 +9,9 @@ import { SystemMenuController } from './menu/system-menu.controller';
 import { SystemDeptController } from './dept/system-dept.controller';
 import { SystemDictController } from './dict/system-dict.controller';
 import { SystemOptionController } from './option/system-option.controller';
+import { SystemFileController } from './file/system-file.controller';
+import { SystemStorageController } from './storage/system-storage.controller';
+import { SystemClientController } from './client/system-client.controller';
 
 /**
  * 系统管理模块，聚合用户、角色、菜单、部门等 /system/* 接口，
@@ -22,6 +25,9 @@ import { SystemOptionController } from './option/system-option.controller';
     SystemDeptController,
     SystemDictController,
     SystemOptionController,
+    SystemFileController,
+    SystemStorageController,
+    SystemClientController,
   ],
   providers: [PrismaService, TokenService, RSADecryptor, PasswordService],
 })

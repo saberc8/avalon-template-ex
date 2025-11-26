@@ -3,6 +3,7 @@ mod db;
 mod security;
 mod application;
 mod interfaces;
+mod id;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -62,4 +63,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

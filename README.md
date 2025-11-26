@@ -1,4 +1,4 @@
-# VOC Admin Monorepo
+# Avalon Admin Monorepo
 
 基于开源项目 **ContiNew Admin / ContiNew Admin UI** 改造的后台管理系统多端一体仓库：
 

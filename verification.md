@@ -77,3 +77,40 @@
 - 待人工/联调验证点：
   - 启动服务后访问 `http://localhost:4398/swagger/index.html`，确认页面能正常打开且接口列表中包含认证模块。
   - 使用 Swagger UI 对 `POST /auth/login`、`POST /auth/logout` 进行调试，确认请求、响应结构与实际业务逻辑一致。
+2025-11-26 Codex
+- 变更内容：修复 backend-node 菜单接口字段为空问题（/system/menu/tree 与 /system/menu/:id）
+- 验证情况：
+  - 本地运行 `npm test`（backend-node）：无测试用例，命令正常结束
+  - 由于缺少可用数据库与前端运行环境，无法在本地直接发起 HTTP 请求验证字段值，仅能从 SQL 与类型映射层面静态验证
+- 风险评估：
+  - 变更仅涉及 SELECT 字段别名补充，不改变筛选条件与业务逻辑；若数据库结构与 prisma/schema.prisma 一致，则风险较低
+  - 建议在联调环境中通过实际菜单管理页面检查路由地址、组件名称、重定向、图标等字段是否正常回显
+
+2025-11-26 Codex
+- 变更内容：为 backend-node 新增文件管理接口 `GET /system/file`，实现文件分页查询，兼容前端 FileItem/PageQuery 结构，解决访问 `/system/file` 返回 404 的问题
+- 验证情况：
+  - 本地执行 `npm test`：仍无专门针对文件模块的自动化测试；命令执行成功
+  - 静态对比 backend-go 的 `FileHandler.ListFile`，确认：
+    - 查询参数 originalName/type/parentPath 的处理逻辑一致
+    - 使用 COUNT(*) 计算总数，并按 page/size 进行分页
+    - SELECT 字段与前端 FileItem 类型字段一一对应，包含存储名称与 URL 构造
+  - 由于缺少实际数据库与对象存储环境，未能在本地发起真实 HTTP 请求和文件访问，仅进行静态代码层面验证
+- 风险评估：
+  - 若数据库中不存在 `sys_file` 或 `sys_storage` 表，则该接口会在运行时失败，需要确保迁移数据库与 Go/Java 版本一致
+  - 存储配置查询错误时，代码会回退为“本地存储”展示，并通过本地路径构造 URL，可能与实际部署的对象存储域名不完全一致，需在联调环境确认
+  - 建议后续补充针对 `/system/file` 的接口级回归测试（包括无数据、有数据、过滤条件、分页边界等场景）
+[2025-11-26 10:13:43] 本轮未在本机运行 PHP 服务器，仅做静态代码检查（容器无 php 命令）。
+
+2025-11-26 Codex
+- 变更内容：修复 backend-node 系统日志接口在查询登录日志（如 `GET /system/log?createTime=...&module=登录&page=1&size=10&sort=createTime,desc`）时返回 500，错误信息为 `Do not know how to serialize a BigInt`
+- 验证情况：
+  - 在 Codex 环境执行 `cd backend-node && npm test`，受限于当前 `test` 脚本仅为占位实现（`echo \"no tests yet\" && exit 0`），附加参数时出现 `sh: exit: too many arguments` 报错，命令退出码为 1，未能进行自动化单元测试。
+  - 通过静态代码检查确认：
+    - 日志分页接口 `/system/log` 中，将从数据库读出的 `time_taken` 与 `status` 字段统一使用 `Number(...)` 转为 JS number 后再返回。
+    - 日志详情接口 `/system/log/:id` 中，将 `status_code`、`time_taken`、`status` 统一使用 `Number(...)` 转换，避免直接返回 BigInt。
+    - 计数 SQL `COUNT(*)::bigint` 的结果在此前已使用 `Number(...)` 转换，本次未改动。
+- 风险评估：
+  - 修改仅涉及数值类型转换，不改变查询逻辑，若数据库中耗时与状态码/状态字段范围处于常规区间，`Number(...)` 不会引入精度问题。
+  - 由于未在本地实际启动 Nest 服务并连库，尚未通过 HTTP 实际访问 `/system/log` 与 `/system/log/:id` 进行端到端验证；建议在联调环境中重点验证：
+    - 查询登录日志与操作日志时接口稳定返回 200，列表数据正常；
+    - 点击日志详情时能正常展开信息，不再出现 500 或 BigInt 序列化错误。

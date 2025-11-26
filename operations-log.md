@@ -339,3 +339,276 @@
 - 风险与说明：
   - 只要数据库中存在 `sys_option` 表及 `LOGIN_CAPTCHA_ENABLED` 配置项，Node 端即可根据该配置控制登录验证码开关；若 Postgres 中尚未同步该行，需要从原 Java 数据库迁移。
   - RSA 解密逻辑调整为使用标准库实现后，前后端应继续复用原有公私钥对，若前端仍报“密码解密失败”，建议抓取前端提交的密文与 Node 环境变量中的密钥配置进行比对。
+2025-11-26 Codex
+- 背景：Java → Node 迁移过程中，前端菜单管理页面出现“路由地址、组件名称为空白”的问题，网络响应中字段存在但值为空字符串
+- 分析过程：
+  - 对比 backend-java 的 RouteResp/AuthServiceImpl 与 backend-node 的 SystemMenuController/AuthService，实现上字段名称与含义基本一致
+  - 排查发现 backend-node 在 /system/menu/tree 与 /system/menu/:id 的 SQL 中，使用了 `COALESCE(m.path, '')` 等写法但未起别名，而查询结果在 NestJS 中是按字段名访问（r.path、r.name 等），导致这些字段始终为 undefined，最终映射为 ''
+  - 与 backend-go 的实现对比确认：Go 版本通过 rows.Scan 按顺序读取列，不依赖列名，因此同一 SQL 在 Go 中正常，在 Node 中失效
+- 实施变更：
+  - 更新 `backend-node/src/modules/system/menu/system-menu.controller.ts`：
+    - 在 `/system/menu/tree` 和 `/system/menu/:id` 查询中，为所有 COALESCE 字段补充别名：
+      - `COALESCE(m.path, '') AS path`
+      - `COALESCE(m.name, '') AS name`
+      - `COALESCE(m.component, '') AS component`
+      - `COALESCE(m.redirect, '') AS redirect`
+      - `COALESCE(m.icon, '') AS icon`
+      - `COALESCE(m.is_external, FALSE) AS is_external`
+      - `COALESCE(m.is_cache, FALSE) AS is_cache`
+      - `COALESCE(m.is_hidden, FALSE) AS is_hidden`
+      - `COALESCE(m.permission, '') AS permission`
+      - `COALESCE(m.sort, 0) AS sort`
+      - `COALESCE(m.status, 1) AS status`
+    - 保持返回结构与 MenuResp 类型定义一致，未调整业务判断逻辑
+- 预期效果：
+  - 再次调用 /system/menu/tree 与 /system/menu/:id 时，返回 JSON 中的 path、name、component 等字段将正确从数据库读取，而不是统一为空字符串
+  - 前端菜单列表与表单回显中，“路由地址”“组件名称”“组件路径”等字段应恢复正常显示
+- 后续建议：
+  - 在联调环境验证：
+    - 菜单列表页：随机抽取多条菜单记录，确认路由地址与组件字段是否正确
+    - 新增/编辑菜单：保存后重新进入编辑页面，检查字段回显是否一致
+  - 后续可为 backend-node 补充基础接口测试，覆盖菜单查询与路由构建的关键路径
+
+2025-11-26 Codex
+- 背景：Node 后端迁移后，访问文件管理页时前端报错 `Cannot GET /system/file?...`，说明 backend-node 尚未实现对应路由，导致整个文件管理列表接口 404
+- 分析过程：
+  - 通过 `rg` 检查 backend-node/src/modules/system 下的模块，确认仅存在 user/role/menu/dept/dict/option 模块，缺少 file 模块和 `/system/file` 路由
+  - 对照 backend-go/internal/interfaces/http/file_handler.go 与 backend-java 的 FileController，确认统一约定：
+    - `GET /system/file`：根据 originalName/type/parentPath + page/size 分页查询文件信息，返回 PageResult<FileItem>
+    - 前端 pc-admin-vue3 的 `listFile` 使用 `PageRes<FileItem[]>` 泛型，请求路径正是 `/system/file`
+  - 结论：当前 404 的直接原因是 backend-node 未注册 `/system/file` 路由，属于迁移缺失
+- 实施变更：
+  - 新增 `backend-node/src/modules/system/file/dto.ts`：
+    - 定义 `FileItem`，字段与前端 `FileItem` 类型保持一致（id/name/originalName/size/url/.../storageName/createUserString/...）
+    - 定义 `FileListQuery`，包含 originalName/type/parentPath/page/size 等查询参数
+  - 新增 `backend-node/src/modules/system/file/system-file.controller.ts`：
+    - 定义 `SystemFileController`，使用 `PrismaService` 直接访问 `sys_file`/`sys_user`/`sys_storage` 表
+    - 实现 `GET /system/file`：
+      - 解析 originalName/type/parentPath/page/size，并构建动态 WHERE 条件，使用 `$queryRawUnsafe` 拼接 SQL 与参数，占位符采用 `$1/$2/...` 风格，兼容 PostgreSQL
+      - 首先执行 `SELECT COUNT(*) FROM sys_file AS f ...` 计算总数，为 0 时返回 `PageResult<FileItem>{ list: [], total: 0 }`
+      - 然后执行分页查询：
+        - SELECT 字段与 Go 版 ListFile 对齐，并为所有 COALESCE 字段显式起别名（extension/content_type/sha256/metadata/thumbnail_name/...），避免字段名不匹配问题
+        - LEFT JOIN `sys_user` 获取 createUserString/updateUserString，时间字段转为 ISO 字符串
+      - 循环构造 `FileItem`：
+        - size/thumbnailSize 为 NULL 时回退为 0，类型统一为 number
+        - storageId > 0 时调用 `getStorageById` 查询 `sys_storage`，填充 storageName 与用于构造 URL 的配置
+        - 使用 `buildStorageFileURL` 构造 file.url 与 thumbnailUrl：
+          - 若为对象存储（type=2）且配置 Domain，则以 Domain 作为前缀
+          - 否则退回到本地存储，使用 `FILE_BASE_URL`（默认 `/file`）+ 路径
+      - 返回 `ok<PageResult<FileItem>>`，结构与其他分页接口一致（`code/data/msg/success/timestamp`）
+    - 实现辅助方法：
+      - `normalizeParentPath`：将 parentPath 归一化为 `/` 或 `/a/b` 格式，去掉多余末尾斜杠
+      - `fileBaseURLPrefix` / `buildLocalFileURL` / `buildStorageFileURL`：参考 Go 版实现本地与对象存储 URL 生成逻辑
+      - `getStorageById`：查询 `sys_storage` 表，映射为 `StorageConfig`，字段与 Go 版 `StorageConfig` 对齐（name/code/type/endpoint/domain/region/...）
+  - 更新 `backend-node/src/modules/system/system.module.ts`：
+    - 引入 `SystemFileController`，并加入 controllers 列表，使 `/system/file` 路由生效
+- 预期效果：
+  - 再次访问 `GET /system/file?page=1&parentPath=/&size=30&sort=type,asc&sort=updateTime,desc` 将返回正常的分页 JSON，而不是 404
+  - 文件管理列表页能够拉取并展示文件/目录数据，字段包括路径、大小、缩略图地址、存储名称等
+- 后续建议：
+  - 在联调环境中通过前端页面验证：
+    - 打开“文件管理”菜单，确认列表能正常加载且分页/过滤生效
+    - 随机检查多条记录，确认 URL/thumbnailUrl 与实际资源访问一致
+  - 后续迭代中继续迁移其它文件相关接口（上传、创建文件夹、统计、校验、重命名、删除等），按照 Go 版行为逐步补齐
+
+2025-11-26 Codex
+- 背景：补齐 `/system/file` 列表接口后，前端调用 `/system/file/statistics` 仍报 `Cannot GET /system/file/statistics`，说明统计接口在 backend-node 中尚未迁移
+- 实施变更：
+  - 更新 `backend-node/src/modules/system/file/dto.ts`：
+    - 新增 `FileStatisticsResp`，字段与前端 `FileStatisticsResp` 对齐：`type/size/number/unit/data[]`
+  - 更新 `backend-node/src/modules/system/file/system-file.controller.ts`：
+    - 新增 `GET /system/file/statistics`：
+      - 执行 SQL：
+        - `SELECT type, COUNT(1) AS number, COALESCE(SUM(size), 0) AS size FROM sys_file WHERE type <> 0 GROUP BY type;`
+      - 若无数据，返回：
+        - `{ type: '', size: 0, number: 0, unit: '', data: [] }`
+      - 若有数据：
+        - 遍历每一行，累加 `size` 与 `number` 得到总值
+        - 为每个 type 构造子项：`{ type: "<type>", size, number, unit: '', data: [] }`
+        - 组装顶层响应：
+          - `size`: 所有子项 size 之和
+          - `number`: 所有子项 number 之和
+          - `unit`: 空字符串（前端使用 `formatFileSize` 自动换算单位）
+          - `data`: 子项列表
+      - 使用 `ok<FileStatisticsResp>` 包装结果，保持统一的 API 响应结构
+- 预期效果：
+  - `/system/file/statistics` 不再返回 404，前端 `FileAsideStatistics` 可正常渲染总存储量（size+unit）与文件数量 number，并展示各类型占比的饼图统计
+- 后续建议：
+  - 在联调环境中调用 `/system/file/statistics`，确认：
+    - `size` 为所有文件（type≠0）总大小之和
+    - `data` 中的 `type` 与前端 `FileTypeList` 匹配，图例名称与数量/大小展示正确
+  - 后续继续迁移 `/system/file/check`、`/system/file/dir` 等接口，完成文件管理模块剩余能力
+
+2025-11-26 Codex
+- 背景：文件管理页已能正常列出数据并展示统计信息，但上传文件时仍报 `Cannot POST /system/file/upload`，说明上传接口在 Node 端未迁移
+- 实施变更：
+  - 更新 `backend-node/src/modules/system/file/dto.ts`：
+    - 新增 `FileUploadResp`，字段与 Java/Go 版一致：`id/url/thUrl/metadata`
+  - 更新 `backend-node/src/modules/system/file/system-file.controller.ts`：
+    - 依赖注入：
+      - 引入 `TokenService` 和 `nextId`，用于解析当前用户和生成唯一 ID
+      - 引入 `fs/path/crypto`，实现本地文件写入与 SHA256 计算
+    - 新增 `POST /system/file/upload`：
+      - 通过 `@UseInterceptors(FileInterceptor('file'))` 接收表单字段 `file` 与 `parentPath`
+      - 从 `Authorization` 头解析当前用户 ID，未登录返回 `401`
+      - 规范化 `parentPath` 为 `/` 或 `/a/b` 形式
+      - 从文件名提取扩展名（`extensionFromFilename`），生成唯一存储名 `storedName = "<id>.<ext>"` 或 `<id>`
+      - 调用 `getDefaultStorage()` 获取默认存储配置：
+        - 若数据库中存在 `sys_storage` 默认记录，使用其 type/bucketName/domain 等配置
+        - 否则退回到本地存储：`./data/file`
+      - 调用 `saveToLocal(bucketPath, parentPath, storedName, file)`：
+        - 归一化父路径，构造逻辑路径 `fullPath`（存入 DB，如 `/2025/1/1/xxx.jpg`）
+        - 将文件写入物理路径：`bucketPath + relative(fullPath)`，创建目录并写入内容
+        - 计算文件的 SHA256 和字节大小，并返回 `{ fullPath, sha, size, contentType }`
+      - 根据扩展名与 `contentType` 调用 `detectFileType` 识别文件类型（图片/文档/音视频/其它）
+      - 使用 `$executeRawUnsafe` 插入 `sys_file` 记录：
+        - 字段：`id/name/original_name/size/parent_path/path/extension/content_type/type/sha256/metadata/thumbnail_* / storage_id/create_user/create_time`
+        - `metadata/thumbnail_*` 暂为空，确保与现有前端兼容
+      - 构造访问 URL：
+        - 使用 `buildStorageFileURL(storageCfg, fullPath)`，当存储为对象存储且配置了 `domain` 时走域名，否则回退到本地 `/file` 前缀
+      - 返回 `ok<FileUploadResp>`：
+        - `id`: 文件记录主键（字符串）
+        - `url` 与 `thUrl` 均为生成的访问 URL
+        - `metadata` 暂为空对象 `{}`，兼容前端解构
+    - 新增辅助方法：
+      - `getDefaultStorage()`：优先查询 `is_default = TRUE` 的存储配置，不存在时回退到本地存储配置
+      - `extensionFromFilename()`、`detectFileType()`：与 Go 版逻辑保持一致
+      - `saveToLocal()`：参考 Go 的 `saveToLocal`，处理目录创建、写文件、SHA256 计算与大小统计
+- 预期效果：
+  - `POST /system/file/upload` 不再返回 404，前端“文件管理”页面上传文件后：
+    - 数据库存有对应 `sys_file` 记录
+    - 接口响应中返回的 `url/thUrl` 可用于预览或下载
+  - 后续建议：
+    - 在联调环境中通过前端上传图片/文档等文件验证：
+      - 列表中是否能看到新文件
+      - 点击预览是否能正常访问 `url`/`thUrl`
+    - 后续可根据需要扩展对象存储直传能力（MinIO/S3），在 Node 中对齐 Go 版 `saveToMinIO` 行为
+
+2025-11-26 Codex
+- 背景：前端“存储配置”页面请求 `/system/storage/list?sort=createTime,desc` 时返回 `Cannot GET /system/storage/list`，说明 backend-node 尚未迁移存储配置相关接口
+- 分析过程：
+  - 对照 backend-go `StorageHandler.RegisterStorageRoutes` 与 Java `StorageController`，存储模块统一暴露 `/system/storage/list`、`/system/storage/:id` 等接口
+  - 检查 backend-node：SystemModule 仅注册了 user/role/menu/dept/dict/option/file 模块，没有 storage 模块
+  - 结论：`/system/storage/list` 404 原因是 Node 端缺少对应 Controller，属于迁移遗漏
+- 实施变更：
+  - 新增 `backend-node/src/modules/system/storage/dto.ts`：
+    - 定义 `StorageResp`，字段对齐前端 `StorageResp` 与 Go 版 `StorageResp`：
+      - `id/name/code/type/accessKey/secretKey/endpoint/region/bucketName/domain/description/isDefault/sort/status/createUserString/createTime/updateUserString/updateTime`
+    - 定义 `StorageQuery`，包含 `description/type/sort`，与前端 `StorageQuery` 对齐（当前实现仅使用 description 和 type）
+  - 新增 `backend-node/src/modules/system/storage/system-storage.controller.ts`：
+    - 定义 `SystemStorageController`，依赖 `PrismaService`
+    - 实现 `GET /system/storage/list`：
+      - 解析查询参数：
+        - `description`：用于模糊匹配名称、编码与描述
+        - `type`：存储类型（1=本地，2=对象存储），字符串或数字均支持
+      - 构建 SQL：
+        - 参考 Go 版 `ListStorage`，拼接 `WHERE` 条件并使用 `$1/$2/...` 占位符
+        - SELECT 字段：
+          - `id/name/code/type/access_key/region/endpoint/bucket_name/domain/description/is_default/sort/status/create_time/create_user_string/update_time/update_user_string`
+        - 为可能为 NULL 的字段使用 `COALESCE` 并起别名，保证字段名与 TypeScript 类型匹配
+        - 使用 `ORDER BY s.sort ASC, s.id ASC` 排序，忽略前端传入的 sort 参数（行为与 Go 一致）
+      - 将查询结果映射为 `StorageResp[]`：
+        - 时间字段使用 `toISOString()` 输出
+        - 列表场景 `secretKey` 始终置为空字符串，与 Go 版保持一致
+      - 通过 `ok(list)` 返回统一响应结构
+  - 更新 `backend-node/src/modules/system/system.module.ts`：
+    - 引入并注册 `SystemStorageController`，使 `/system/storage/list` 路由在 Nest 应用中生效
+- 预期效果：
+  - 访问 `GET /system/storage/list?sort=createTime,desc` 将返回存储配置列表，而不再是 404
+  - 前端“存储配置”页面能够正常加载并展示配置列表，包含默认存储、状态、创建/更新时间等信息
+- 后续建议：
+  - 在联调环境中验证：
+    - `/system/storage/list` 返回的字段与前端 `StorageResp` 类型完全匹配
+    - 至少存在一条默认存储配置（通常为本地存储），`isDefault=true`
+  - 后续如需支持新增/修改/删除存储配置，可继续按 Go 版 `CreateStorage/UpdateStorage/DeleteStorage` 逻辑迁移，补充 `/system/storage` 的其它 REST 接口
+
+2025-11-26 Codex
+- 背景：文件管理模块已支持列表、统计与上传，但前端在执行“重命名”与“删除”操作时分别调用 `PUT /system/file/:id` 与 `DELETE /system/file`，Node 端未实现对应路由，导致 404 错误
+- 实施变更：
+  - 更新 `backend-node/src/modules/system/file/system-file.controller.ts`：
+    - 引入 `Delete/Put/Param` 装饰器与 `IdsRequest`，以支持删除与更新接口
+    - 新增 `PUT /system/file/:id`：
+      - 从 `Authorization` 解析当前用户 ID，未登录返回 `401`
+      - 校验 ID > 0，body 中 `originalName` 非空，否则返回 `400`
+      - 执行：
+        - `UPDATE sys_file SET original_name = $1, update_user = $2, update_time = $3 WHERE id = $4;`
+      - 成功返回 `ok(true)`，失败时返回 `500 重命名失败`
+    - 新增 `DELETE /system/file`：
+      - 接收 `IdsRequest`（body: `{ ids: number[] }`），过滤非法 ID，列表为空时返回 `400`
+      - 查询所有待删记录：
+        - `SELECT id, name, path, parent_path, type, storage_id FROM sys_file WHERE id = ANY($ids);`
+      - 对 type=0 的目录，校验是否为空：
+        - 若存在子记录 `parent_path = dir.path`，返回 `400`，提示“文件夹 [name] 不为空，请先删除文件夹下的内容”
+      - 构建 `toDeleteFiles`（仅文件，不含目录），执行：
+        - `DELETE FROM sys_file WHERE id = ANY($1::bigint[]);`
+      - 逻辑删除成功后，尽力删除本地物理文件：
+        - 使用 `getStorageById` 或 `getDefaultStorage` 获取存储配置
+        - 基于 `bucketName` 与 `path` 组装绝对路径，并调用 `fs.promises.unlink` 删除文件，失败忽略
+      - 最终返回 `ok(true)`；任意数据库异常返回 `500 删除文件失败`
+- 预期效果：
+  - 前端“文件管理”页面执行“重命名”与“删除文件/空文件夹”操作时，不再出现 404，接口返回成功
+  - 删除文件后列表中记录消失，且本地存储目录中的文件被尽力清理（允许残留极少数物理文件作为可接受风险）
+
+2025-11-26 10:11:29 Codex
+- 任务：Java → Python 后端迁移（认证与在线用户部分），保持与同一前端代码兼容
+- 主要变更：
+  - 在 `backend-python/app/security/online_store.py` 中新增 `OnlineStore` 内存会话存储，实现在线用户记录、删除与分页查询，时间格式与前端 `OnlineUserResp` 对齐。
+  - 在 `backend-python/app/routers/auth.py` 中：
+    - 登录成功后根据请求头解析 IP 与 User-Agent，调用 `OnlineStore.record_login` 记录在线会话。
+    - 新增 `POST /auth/logout`，解析当前 Token，移除对应在线会话并返回当前用户 ID。
+  - 在 `backend-python/app/routers/monitor_online.py` 中新增：
+    - `GET /monitor/online`：支持昵称与登录时间范围筛选，返回 `PageResult<OnlineUserResp>`。
+    - `DELETE /monitor/online/{token}`：校验请求身份，禁止强退自己，成功后从在线列表移除目标会话。
+  - 在 `backend-python/app/main.py` 中注册新路由模块 `monitor_online`。
+- 验证说明：
+  - 使用 `python3 -m py_compile $(git ls-files 'backend-python/**/*.py')` 进行语法校验，未发现编译错误。
+  - 受限于当前环境未启动 FastAPI 服务与数据库，未执行实际 HTTP 请求联调；需要在本地或联调环境中通过后台“系统监控 → 在线用户”页面验证接口行为。
+
+2025-11-26 10:19:37 Codex
+- 任务：Java → Python 后端迁移（系统管理模块 /system/menu、/system/dept、/system/dict、/system/option）
+- 主要变更：
+  - 在 `backend-python/app/routers/system_menu.py` 中新增菜单管理接口：
+    - `GET /system/menu/tree`：查询菜单树，按 `sort,id` 排序，并组装子节点，字段与前端 `MenuResp` 保持一致。
+    - `GET /system/menu/{id}`：查询单个菜单详情。
+    - `POST /system/menu`：新增菜单，按 Node/Go 逻辑校验外链路由、路径前缀与排序，写入 `sys_menu`，使用 `next_id()` 生成主键。
+    - `PUT /system/menu/{id}`：修改菜单基础信息与显示属性。
+    - `DELETE /system/menu`：支持批量删除菜单及其子节点，同时删除 `sys_role_menu` 关联记录。
+    - `DELETE /system/menu/cache`：当前无缓存实现，直接返回成功，保持与 Node/Go 行为一致。
+  - 在 `backend-python/app/routers/system_dept.py` 中新增部门管理接口：
+    - `GET /system/dept/tree`：支持按描述与状态过滤部门树，结构对齐 `DeptResp`。
+    - `GET /system/dept/{id}`：返回部门详情。
+    - `POST /system/dept`：新增部门，检查同级名称唯一性和上级存在性。
+    - `PUT /system/dept/{id}`：修改部门信息，对系统内置部门限制禁用与变更上级。
+    - `DELETE /system/dept`：删除前校验系统内置标记、子部门与用户关联，并清理 `sys_role_dept`。
+    - `GET /system/dept/export`：导出 CSV 文本，与 Node/Go 字段顺序一致。
+  - 在 `backend-python/app/routers/system_dict.py` 中新增字典管理接口：
+    - 字典：`GET /system/dict/list`、`GET /system/dict/{id}`、`POST /system/dict`、`PUT /system/dict/{id}`、`DELETE /system/dict`（保护系统内置字典，级联删除字典项）。
+    - 字典项：`GET /system/dict/item`（内存分页）、`GET /system/dict/item/{id}`、`POST /system/dict/item`、`PUT /system/dict/item/{id}`、`DELETE /system/dict/item`，均对齐 Node/Go 的字段与校验逻辑。
+    - `DELETE /system/dict/cache/{code}`：清理字典缓存，目前为无操作占位。
+  - 在 `backend-python/app/routers/system_option.py` 中新增系统配置接口：
+    - `GET /system/option`：支持 `code` 多值与 `category` 过滤，返回 `OptionResp` 列表。
+    - `PUT /system/option`：批量更新配置值，使用 `_to_option_value_string` 将任意类型转换为字符串，与 Node/Java/Go 行为保持一致。
+    - `PATCH /system/option/value`：按类别或编码列表重置 `value=NULL`，恢复默认值。
+  - 在 `backend-python/app/main.py` 中注册 `system_menu`、`system_dept`、`system_dict`、`system_option` 四个新路由模块。
+- 验证说明：
+  - 使用 `python3 -m py_compile $(git ls-files 'backend-python/**/*.py')` 对 backend-python 全部模块进行了语法校验，未发现编译错误。
+  - 通过 `rg` 检查确认 `/system/user`、`/system/role`、`/system/menu`、`/system/dept`、`/system/dict`、`/system/option` 等核心系统管理接口在 Python 版本中已存在对应路由，实现与 Node/Go 版本的路径和基本行为对齐。
+  - 由于当前环境未实际启动 FastAPI 与数据库，未执行 HTTP 级联调；需要在本地或联调环境结合 pc-admin 前端逐个页面进行冒烟测试（用户、角色、菜单、部门、字典、系统配置等）。
+
+2025-11-26 Codex
+- 任务：为仓库添加 Git 提交忽略规则与统一启动说明文档
+- 主要变更：
+  - 在仓库根目录新增 `.gitignore`：
+    - 忽略通用临时文件与日志：`.DS_Store`、`*.log`、`*.tmp`、`*.swp` 等。
+    - 忽略 Node/前端构建与依赖目录：`node_modules/`、`dist/`、`build/`、`.next/`、`.nuxt/`、`.vite/` 等。
+    - 忽略 Python 缓存与虚拟环境：`__pycache__/`、`*.py[cod]`、`.venv/`、`venv/`。
+    - 忽略 Rust 编译目录 `target/` 与部分 Java/Maven/IDE 生成文件（`target/`、`.idea/`、`*.iml` 等）。
+    - 忽略统一日志目录 `logs/` 以及部分环境文件变体（`.env.*.local`）。
+  - 新增 `README-startup.md`：
+    - 概述目前多后端（`backend-go`、`backend-java`、`backend-node`、`backend-python` 等）与多前端（`pc-admin-vue3`、`pc-admin-nextjs`、`h5-nextjs`、移动端）整体结构。
+    - 给出推荐启动组合：Python 后端 + Vue3 管理端，以及 Node/Go 后端的可选启动方式。
+    - 列出各子项目的常用启动命令与环境变量约定（数据库、认证相关配置等），便于在本地快速完成联调。
+- 验证说明：
+  - `.gitignore` 为纯配置文件，未执行额外命令；后续需在本地确认不影响既有必要文件的提交。
+  - `README-startup.md` 为纯文档更新，未对现有代码与配置造成影响。 
+[2025-11-26 10:13:43] 完成 PHP /common、/system/option、/system/dict 路由迁移，已对齐 Java/Node 接口。

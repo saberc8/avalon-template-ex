@@ -3,10 +3,11 @@ mod auth_handler;
 mod captcha_handler;
 mod common_handler;
 mod user_handler;
+mod system_user_handler;
 
 use std::sync::Arc;
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
@@ -41,6 +42,49 @@ pub fn build_router(state: Arc<AppState>, file_root: String) -> Router {
         .route(
             "/common/dict/:code",
             get(common_handler::list_dict_by_code),
+        )
+        // System User
+        .route(
+            "/system/user",
+            get(system_user_handler::list_user_page)
+                .post(system_user_handler::create_user),
+        )
+        .route(
+            "/system/user/list",
+            get(system_user_handler::list_all_user),
+        )
+        .route(
+            "/system/user/:id",
+            get(system_user_handler::get_user_detail)
+                .put(system_user_handler::update_user),
+        )
+        .route(
+            "/system/user",
+            delete(system_user_handler::delete_user),
+        )
+        .route(
+            "/system/user/:id/password",
+            patch(system_user_handler::reset_password),
+        )
+        .route(
+            "/system/user/:id/role",
+            patch(system_user_handler::update_user_role),
+        )
+        .route(
+            "/system/user/export",
+            get(system_user_handler::export_user),
+        )
+        .route(
+            "/system/user/import/template",
+            get(system_user_handler::download_import_template),
+        )
+        .route(
+            "/system/user/import/parse",
+            post(system_user_handler::parse_import_user),
+        )
+        .route(
+            "/system/user/import",
+            post(system_user_handler::import_user),
         )
         // 静态文件访问，与 Go 版 r.Static("/file", fileRoot) 对齐
         .nest_service("/file", static_service)

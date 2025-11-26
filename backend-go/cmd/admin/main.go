@@ -23,7 +23,7 @@ import (
 
 // @title voc-go-backend 接口文档
 // @version 1.0
-// @description VOC 平台 Go 后端接口文档，涵盖认证、系统管理、日志等模块。
+// @description Avalon 平台 Go 后端接口文档，涵盖认证、系统管理、日志等模块。
 // @BasePath /
 // @schemes http
 // @securityDefinitions.apikey BearerAuth
