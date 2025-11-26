@@ -11,6 +11,7 @@ import (
 
 	appauth "voc-go-backend/internal/application/auth"
 	docs "voc-go-backend/docs"
+	"voc-go-backend/internal/infrastructure/cache"
 	rbacdomain "voc-go-backend/internal/domain/rbac"
 	"voc-go-backend/internal/domain/user"
 	"voc-go-backend/internal/infrastructure/db"
@@ -38,6 +39,14 @@ func main() {
 		log.Fatalf("failed to connect postgres: %v", err)
 	}
 	defer pg.Close()
+
+	// 1.0 初始化 Redis 连接（验证码等缓存使用）
+	redisCfg := cache.LoadConfigFromEnv()
+	redisClient, err := cache.NewRedis(redisCfg)
+	if err != nil {
+		log.Fatalf("failed to connect redis: %v", err)
+	}
+	defer redisClient.Close()
 
 	// 1.1 自动迁移/初始化数据库（仅 sys_user 和默认 admin）
 	if err := db.AutoMigrate(pg); err != nil {
@@ -101,11 +110,11 @@ func main() {
 	commonHandler.RegisterCommonRoutes(r)
 
 	// 验证码接口（登录图片验证码）
-	captchaHandler := httpif.NewCaptchaHandler(pg)
+	captchaHandler := httpif.NewCaptchaHandler(pg, redisClient)
 	captchaHandler.RegisterCaptchaRoutes(r)
 
 	// 登录与用户接口
-	authHandler := httpif.NewAuthHandler(authSvc, onlineStore, pg)
+	authHandler := httpif.NewAuthHandler(authSvc, onlineStore, pg, redisClient)
 	authHandler.RegisterAuthRoutes(r)
 	userHandler := httpif.NewUserHandler(userRepo, roleRepo, menuRepo, tokenSvc)
 	userHandler.RegisterUserRoutes(r)

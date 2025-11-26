@@ -11,6 +11,7 @@ from ..security.jwt_token import TokenClaims, TokenService
 from ..security.online_store import get_online_store
 from ..security.password import PasswordVerifier
 from ..security.rsa import RSADecryptor
+from ..redis_client import redis_delete, redis_get
 
 router = APIRouter()
 
@@ -27,6 +28,27 @@ def get_rsa_decryptor() -> RSADecryptor:
     return RSADecryptor.from_base64_key(s.rsa_private_key_b64)
 
 
+def _is_login_captcha_enabled() -> bool:
+    """读取 sys_option 中 LOGIN_CAPTCHA_ENABLED 配置，判断是否启用登录验证码。"""
+    from ..db import get_db_cursor as _get_cursor
+
+    with _get_cursor() as cur:
+        cur.execute(
+            """
+SELECT COALESCE(value, default_value, '0') AS val
+FROM sys_option
+WHERE code = %s
+LIMIT 1;
+""",
+            ("LOGIN_CAPTCHA_ENABLED",),
+        )
+        row = cur.fetchone()
+    if not row:
+        return False
+    val = str(row["val"]).strip()
+    return bool(val and val != "0")
+
+
 def parse_token(auth_header: str | None, token_svc: TokenService) -> TokenClaims | None:
     """从 Authorization 头中解析用户信息。"""
     if not auth_header:
@@ -37,14 +59,33 @@ def parse_token(auth_header: str | None, token_svc: TokenService) -> TokenClaims
 @router.post("/auth/login")
 def login(
     req: LoginRequest,
+    request: Request,
     token_svc: TokenService = Depends(get_token_service),
     decryptor: RSADecryptor = Depends(get_rsa_decryptor),
-    request: Request | None = None,
 ):
     """账号密码登录，保持与 Java/Go 逻辑一致。"""
     auth_type = (req.authType or "").strip().upper()
     if auth_type and auth_type != "ACCOUNT":
         return fail("400", "暂不支持该认证方式")
+
+    # 当配置启用登录验证码且为账号登录时，先校验图形验证码。
+    # 行为对齐 Java AccountLoginHandler.preLogin / Go AuthHandler.Login：
+    # - LOGIN_CAPTCHA_ENABLED=0：不校验验证码；
+    # - LOGIN_CAPTCHA_ENABLED!=0：必须校验 uuid + captcha。
+    if not auth_type or auth_type == "ACCOUNT":
+        if _is_login_captcha_enabled():
+            if not (req.captcha or "").strip():
+                return fail("400", "验证码不能为空")
+            if not (req.uuid or "").strip():
+                return fail("400", "验证码标识不能为空")
+            captcha_key = f"CAPTCHA:{req.uuid.strip()}"
+            stored = redis_get(captcha_key)
+            if not stored:
+                return fail("400", "验证码已过期")
+            # 使用一次后立即删除，防止重复使用
+            redis_delete(captcha_key)
+            if (req.captcha or "").strip().lower() != stored.strip().lower():
+                return fail("400", "验证码不正确")
 
     if not req.clientId.strip():
         return fail("400", "客户端ID不能为空")
@@ -387,4 +428,3 @@ WHERE rm.role_id = ANY(%s);
 
     # 返回 Pydantic 可序列化结构
     return ok([r.dict() for r in roots])
-

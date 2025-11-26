@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Header, Patch, Put, Query
+from fastapi import APIRouter, Body, Header, Query
 from pydantic import BaseModel, Field
 
 from ..api_response import fail, ok
@@ -233,4 +233,3 @@ UPDATE sys_option
             return fail("500", "恢复默认配置失败")
 
     return ok(True)
-

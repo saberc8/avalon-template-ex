@@ -1,6 +1,17 @@
 from passlib.hash import bcrypt
 
 
+def _truncate_to_72_bytes(raw_password: str) -> str:
+    """将明文密码按 BCrypt 规范截断到 72 字节，保持与 Java/Go 行为一致。"""
+    if not raw_password:
+        return raw_password
+    data = raw_password.encode("utf-8")
+    if len(data) <= 72:
+        return raw_password
+    truncated = data[:72]
+    return truncated.decode("utf-8", errors="ignore")
+
+
 class PasswordVerifier:
     """BCrypt 密码校验器，兼容 `{bcrypt}` 前缀格式。"""
 
@@ -14,10 +25,12 @@ class PasswordVerifier:
         """
         if not encoded_password:
             return False
+        # 先按 BCrypt 规范将明文截断到 72 字节，兼容 Java/Go 的实现
+        raw = _truncate_to_72_bytes(raw_password)
         enc = encoded_password
         if enc.startswith("{bcrypt}"):
             enc = enc[len("{bcrypt}") :]
-        return bcrypt.verify(raw_password, enc)
+        return bcrypt.verify(raw, enc)
 
 
 class PasswordHasher:
@@ -34,6 +47,7 @@ class PasswordHasher:
         """
         if not raw_password:
             raise ValueError("密码不能为空")
-        hashed = bcrypt.hash(raw_password)
+        # 与校验逻辑一致，先截断到 72 字节再加密
+        raw = _truncate_to_72_bytes(raw_password)
+        hashed = bcrypt.hash(raw)
         return "{bcrypt}" + hashed
-

@@ -613,3 +613,16 @@
   - `README-startup.md` 为纯文档更新，未对现有代码与配置造成影响。 
 [2025-11-26 10:13:43] 完成 PHP /common、/system/option、/system/dict 路由迁移，已对齐 Java/Node 接口。
 [2025-11-26 12:40:12] PHP: 新增 UserProfileRoutes，实现 /user/profile/avatar/basic.info/password/phone/email/social 接口，对齐 Java 前端约定。
+
+[2025-11-26 14:58:28] backend-python: 修复 FastAPI 登录路由 Request 注解导致应用无法启动的问题（将 Request | None 改为 Request）。
+
+[2025-11-26 15:43:11] backend-python: 依次修复 FastAPI 导入错误（Request 注解、Param/Patch 名称）并安装 python-multipart，使应用可正常启动。
+
+[2025-11-26 15:48:22] backend-python: 修复 Passlib 与 bcrypt 版本不兼容导致登录 500，固定 bcrypt==3.2.0 并已安装。
+
+[2025-11-26 15:51:51] backend-python: 实现 /captcha/image 与 Go/Java 等价逻辑（读取 LOGIN_CAPTCHA_ENABLED，启用时生成 Base64 图形验证码）。
+
+[2025-11-26 15:55:49] backend-python: 集成 Redis 并实现与 Java 一致的图形验证码存储与登录校验逻辑（CAPTCHA:{uuid} 键，登录时校验并删除）。
+[2025-11-26 16:04:33] Codex: 更新 Go 验证码逻辑为 Redis 存储，并运行 go test ./... 验证通过。
+
+[2025-11-26 16:05:49] backend-python: 新增 system_file 路由，迁移 Java/Go 文件管理接口到 Python（上传/分页/目录/统计/校验/重命名/删除，本地存储优先）。

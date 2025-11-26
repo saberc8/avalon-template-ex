@@ -13,6 +13,12 @@ class Settings:
     db_name: str = os.getenv("DB_NAME", "nv_admin")
     db_sslmode: str = os.getenv("DB_SSLMODE", "disable")
 
+    # Redis 配置（参考 Java application-dev.yml）
+    redis_host: str = os.getenv("REDIS_HOST", "127.0.0.1")
+    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db: int = int(os.getenv("REDIS_DB", "0"))
+    redis_password: str | None = os.getenv("REDIS_PWD") or None
+
     # 认证配置（与 Go/Java 保持一致）
     rsa_private_key_b64: str = os.getenv(
         "AUTH_RSA_PRIVATE_KEY",
@@ -26,5 +32,4 @@ class Settings:
 def get_settings() -> Settings:
     """获取单例配置实例。"""
     return Settings()
-
 

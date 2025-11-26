@@ -4,6 +4,7 @@ mod captcha_handler;
 mod common_handler;
 mod user_handler;
 mod system_user_handler;
+mod system_role_handler;
 
 use std::sync::Arc;
 
@@ -86,9 +87,40 @@ pub fn build_router(state: Arc<AppState>, file_root: String) -> Router {
             "/system/user/import",
             post(system_user_handler::import_user),
         )
+        // System Role
+        .route(
+            "/system/role/list",
+            get(system_role_handler::list_role),
+        )
+        .route(
+            "/system/role/:id",
+            get(system_role_handler::get_role)
+                .put(system_role_handler::update_role),
+        )
+        .route(
+            "/system/role",
+            post(system_role_handler::create_role)
+                .delete(system_role_handler::delete_role),
+        )
+        .route(
+            "/system/role/:id/permission",
+            put(system_role_handler::update_role_permission),
+        )
+        .route(
+            "/system/role/:id/user",
+            get(system_role_handler::page_role_user)
+                .post(system_role_handler::assign_to_users),
+        )
+        .route(
+            "/system/role/user",
+            delete(system_role_handler::unassign_from_users),
+        )
+        .route(
+            "/system/role/:id/user/id",
+            get(system_role_handler::list_role_user_ids),
+        )
         // 静态文件访问，与 Go 版 r.Static("/file", fileRoot) 对齐
         .nest_service("/file", static_service)
         .layer(cors)
         .with_state(state)
 }
-

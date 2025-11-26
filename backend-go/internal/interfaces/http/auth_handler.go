@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mojocn/base64Captcha"
+	"github.com/redis/go-redis/v9"
 
 	"voc-go-backend/internal/application/auth"
 )
@@ -15,15 +15,17 @@ type AuthHandler struct {
 	svc    *auth.Service
 	online *OnlineStore
 	db     *sql.DB
+	redis  *redis.Client
 }
 
 // NewAuthHandler 创建认证接口处理器。
 // 其中 db 用于读取登录相关配置（如是否启用验证码）。
-func NewAuthHandler(svc *auth.Service, online *OnlineStore, db *sql.DB) *AuthHandler {
+func NewAuthHandler(svc *auth.Service, online *OnlineStore, db *sql.DB, redisClient *redis.Client) *AuthHandler {
 	return &AuthHandler{
 		svc:    svc,
 		online: online,
 		db:     db,
+		redis:  redisClient,
 	}
 }
 
@@ -71,11 +73,28 @@ func (h *AuthHandler) Login(c *gin.Context) {
 				Fail(c, "400", "验证码标识不能为空")
 				return
 			}
-			// 使用 base64Captcha.DefaultMemStore 校验验证码并在成功时自动删除。
-			if ok := base64Captcha.DefaultMemStore.Verify(req.UUID, req.Captcha, true); !ok {
+			// 使用 Redis 校验验证码，key 与 Java 一致：CAPTCHA:{uuid}
+			if h.redis == nil {
+				Fail(c, "500", "验证码服务未初始化")
+				return
+			}
+			ctx := c.Request.Context()
+			key := buildCaptchaRedisKey(strings.TrimSpace(req.UUID))
+			val, err := h.redis.Get(ctx, key).Result()
+			if err != nil {
+				if err == redis.Nil {
+					Fail(c, "400", "验证码不正确或已过期")
+					return
+				}
+				Fail(c, "500", "验证码校验失败")
+				return
+			}
+			if !strings.EqualFold(strings.TrimSpace(req.Captcha), strings.TrimSpace(val)) {
 				Fail(c, "400", "验证码不正确或已过期")
 				return
 			}
+			// 校验通过后删除验证码，避免重复使用。
+			_, _ = h.redis.Del(ctx, key).Result()
 		}
 	}
 

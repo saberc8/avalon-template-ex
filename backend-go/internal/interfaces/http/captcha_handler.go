@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mojocn/base64Captcha"
+	"github.com/redis/go-redis/v9"
 )
 
 // CaptchaResp matches the Java CaptchaResp structure.
@@ -20,7 +21,8 @@ type CaptchaResp struct {
 
 // CaptchaHandler exposes /captcha endpoints.
 type CaptchaHandler struct {
-	db *sql.DB
+	db    *sql.DB
+	redis *redis.Client
 }
 
 // NewCaptchaHandler 创建验证码处理器。
@@ -28,8 +30,8 @@ type CaptchaHandler struct {
 // - 读取 sys_option 表中的 LOGIN_CAPTCHA_ENABLED 判断是否启用登录验证码；
 // - 启用时生成 Base64 图片验证码并返回 uuid、图片与过期时间；
 // - 未启用时仅返回 isEnabled=false，前端据此隐藏验证码输入框。
-func NewCaptchaHandler(db *sql.DB) *CaptchaHandler {
-	return &CaptchaHandler{db: db}
+func NewCaptchaHandler(db *sql.DB, redisClient *redis.Client) *CaptchaHandler {
+	return &CaptchaHandler{db: db, redis: redisClient}
 }
 
 // RegisterCaptchaRoutes registers /captcha endpoints.
@@ -67,10 +69,20 @@ func (h *CaptchaHandler) GetImageCaptcha(c *gin.Context) {
 	driver := base64Captcha.NewDriverDigit(40, 120, 4, 0.7, 80)
 	captcha := base64Captcha.NewCaptcha(driver, base64Captcha.DefaultMemStore)
 
-	id, b64s, _, err := captcha.Generate()
+	id, b64s, answer, err := captcha.Generate()
 	if err != nil {
 		Fail(c, "500", "生成验证码失败")
 		return
+	}
+
+	// 将验证码内容写入 Redis，使用与 Java 一致的前缀：CAPTCHA:{uuid}
+	if h.redis != nil {
+		key := buildCaptchaRedisKey(id)
+		ctx := c.Request.Context()
+		if err := h.redis.Set(ctx, key, answer, graphicCaptchaExpirationMinutes*time.Minute).Err(); err != nil {
+			Fail(c, "500", "保存验证码失败")
+			return
+		}
 	}
 
 	expireTime := time.Now().Add(graphicCaptchaExpirationMinutes * time.Minute).UnixMilli()
@@ -86,6 +98,13 @@ func (h *CaptchaHandler) GetImageCaptcha(c *gin.Context) {
 		IsEnabled:  true,
 	}
 	OK(c, resp)
+}
+
+// buildCaptchaRedisKey 构建验证码在 Redis 中的 key。
+// 对齐 Java 侧 CacheConstants.CAPTCHA_KEY_PREFIX：CAPTCHA:{uuid}
+func buildCaptchaRedisKey(id string) string {
+	const prefix = "CAPTCHA:"
+	return prefix + id
 }
 
 // isLoginCaptchaEnabled 读取 sys_option 中的 LOGIN_CAPTCHA_ENABLED 配置。

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Header, Param, Path, Query
+from fastapi import APIRouter, Body, Header, Path, Query
 from pydantic import BaseModel, Field
 
 from ..api_response import fail, ok
@@ -645,4 +645,3 @@ WHERE id = ANY(%s::bigint[]);
 def clear_dict_cache(code: str = Path(...)):
     """清理字典缓存（当前无缓存逻辑，直接返回成功）。"""
     return ok(True)
-
