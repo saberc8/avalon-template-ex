@@ -12,7 +12,7 @@
 
 ## 1. 目录概览
 
-- `backend-python`：FastAPI 实现的后端服务（推荐起步）
+- `backend-python`：FastAPI 实现的后端服务
 - `backend-go`：Go + Gin 实现的后端服务
 - `backend-node`：NestJS + Prisma 实现的后端服务
 - `backend-java`：原版 ContiNew Admin Java 后端
