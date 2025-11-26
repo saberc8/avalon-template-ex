@@ -1,5 +1,7 @@
 # Avalon Admin Monorepo
 
+> AI代码占比 100%，全程使用codex以及copilot完成
+
 > 更新日期：2025-11-26（执行者：Codex）
 
 多端一体的后台管理系统示例仓库，包含多种后端实现（Java / Go / Node / Python）与多端前端（PC 管理端、H5、App 等），便于对比学习和本地联调。
