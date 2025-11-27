@@ -11,8 +11,8 @@
 
     <!-- 应用名 -->
     <springProperty name="APP_NAME" source="spring.application.name" scope="context"/>
-    <!-- 保存路径 -->
-    <property name="LOG_PATH" value="${LOG_PATH:-./logs}"/>
+    <!-- 保存路径（默认写入 backend-java/logs 目录，与 continew-webapi 同级） -->
+    <property name="LOG_PATH" value="${LOG_PATH:-../logs}"/>
     <!-- 字符集 -->
     <property name="LOG_CHARSET" value="utf-8"/>
     <!-- 格式化输出：%d 表示日期；%thread 表示线程名；%-5level：级别从左显示 5 个字符宽度；%msg：日志消息；%n 是换行符 -->
