@@ -11,7 +11,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.URLUtil;
 import cn.hutool.http.HttpStatus;
 import cn.hutool.json.JSONUtil;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Async;
 import top.continew.admin.auth.enums.AuthTypeEnum;
@@ -45,12 +44,17 @@ import java.util.Set;
  * @author Charles7c
  * @since 2023/12/16 23:55
  */
-@RequiredArgsConstructor
 public class LogDaoLocalImpl implements LogDao {
 
     private final UserService userService;
     private final LogMapper logMapper;
     private final TraceProperties traceProperties;
+
+    public LogDaoLocalImpl(UserService userService, LogMapper logMapper, TraceProperties traceProperties) {
+        this.userService = userService;
+        this.logMapper = logMapper;
+        this.traceProperties = traceProperties;
+    }
 
     @Async
     @Override

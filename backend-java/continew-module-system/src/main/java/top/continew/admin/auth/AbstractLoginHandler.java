@@ -52,9 +52,9 @@ public abstract class AbstractLoginHandler<T extends LoginReq> implements LoginH
     @Resource
     private ThreadPoolTaskExecutor threadPoolTaskExecutor;
 
-    protected static final String CAPTCHA_EXPIRED = "验证码已失效";
-    protected static final String CAPTCHA_ERROR = "验证码不正确";
-    protected static final String CLIENT_ID = "clientId";
+    public static final String CAPTCHA_EXPIRED = "验证码已失效";
+    public static final String CAPTCHA_ERROR = "验证码不正确";
+    public static final String CLIENT_ID = "clientId";
 
     @Override
     public void preLogin(T req, ClientResp client, HttpServletRequest request) {

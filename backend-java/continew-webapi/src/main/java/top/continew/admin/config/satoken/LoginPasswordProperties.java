@@ -21,4 +21,8 @@ public class LoginPasswordProperties {
      * 排除（放行）路径配置
      */
     private String[] excludes = new String[0];
+
+    public String[] getExcludes() {
+        return excludes;
+    }
 }

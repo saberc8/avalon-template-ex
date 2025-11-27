@@ -139,6 +139,14 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Spring Boot 运行插件，支持 mvn spring-boot:run -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>${main-class}</mainClass>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

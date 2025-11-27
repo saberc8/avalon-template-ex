@@ -10,7 +10,8 @@ import com.alicp.jetcache.anno.config.EnableMethodCache;
 import com.github.xiaoymin.knife4j.spring.configuration.Knife4jProperties;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.dromara.x.file.storage.spring.EnableFileStorage;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -30,7 +31,6 @@ import top.continew.starter.web.model.R;
  * @author Charles7c
  * @since 2022/12/8 23:15
  */
-@Slf4j
 @EnableFileStorage
 @EnableMethodCache(basePackages = "top.continew.admin")
 @EnableGlobalResponse
@@ -39,6 +39,8 @@ import top.continew.starter.web.model.R;
 @SpringBootApplication
 @RequiredArgsConstructor
 public class ContiNewAdminApplication implements ApplicationRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(ContiNewAdminApplication.class);
 
     private final ProjectProperties projectProperties;
     private final ServerProperties serverProperties;
