@@ -1,0 +1,327 @@
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+
+use crate::{
+    application::system::{
+        ensure_max_chars, format_datetime, format_optional_datetime, trim_to_none,
+    },
+    infrastructure::persistence::system_role_repository::{
+        RoleCreateRecord, RoleListFilter, RolePermissionRecord, RoleRecord, RoleUpdateRecord,
+        SystemRoleRepository,
+    },
+    shared::{error::AppError, id::next_id},
+};
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleQuery {
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleCommand {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub code: String,
+    #[serde(default)]
+    pub sort: i32,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub data_scope: i16,
+    #[serde(default)]
+    pub dept_ids: Vec<i64>,
+    #[serde(default = "default_true")]
+    pub dept_check_strictly: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RolePermissionCommand {
+    #[serde(default)]
+    pub menu_ids: Vec<i64>,
+    #[serde(default = "default_true")]
+    pub menu_check_strictly: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleResp {
+    pub id: i64,
+    pub name: String,
+    pub code: String,
+    pub sort: i32,
+    pub description: String,
+    pub data_scope: i16,
+    pub is_system: bool,
+    pub create_user_string: String,
+    pub create_time: String,
+    pub update_user_string: String,
+    pub update_time: String,
+    pub disabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleDetailResp {
+    #[serde(flatten)]
+    pub role: RoleResp,
+    pub menu_ids: Vec<i64>,
+    pub dept_ids: Vec<i64>,
+    pub menu_check_strictly: bool,
+    pub dept_check_strictly: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct RoleService {
+    roles: SystemRoleRepository,
+}
+
+impl RoleService {
+    pub fn new(db: PgPool) -> Self {
+        Self {
+            roles: SystemRoleRepository::new(db),
+        }
+    }
+
+    pub async fn list(&self, query: RoleQuery) -> Result<Vec<RoleResp>, AppError> {
+        let roles = self
+            .roles
+            .list(&RoleListFilter {
+                description: query.description.as_deref(),
+            })
+            .await?
+            .into_iter()
+            .map(RoleResp::from)
+            .collect();
+        Ok(roles)
+    }
+
+    pub async fn get(&self, id: i64) -> Result<RoleDetailResp, AppError> {
+        let record = self.roles.get(id).await?.ok_or(AppError::NotFound)?;
+        let menu_ids = self.roles.menu_ids(id).await?;
+        let dept_ids = self.roles.dept_ids(id).await?;
+        Ok(RoleDetailResp {
+            menu_check_strictly: record.menu_check_strictly,
+            dept_check_strictly: record.dept_check_strictly,
+            role: RoleResp::from(record),
+            menu_ids,
+            dept_ids,
+        })
+    }
+
+    pub async fn create(&self, user_id: i64, command: RoleCommand) -> Result<i64, AppError> {
+        let command = normalize_role_command(command)?;
+        ensure_unique_name(&self.roles, &command.name, None).await?;
+        ensure_unique_code(&self.roles, &command.code, None).await?;
+
+        let id = next_id();
+        self.roles
+            .create(&RoleCreateRecord {
+                id,
+                name: command.name,
+                code: command.code,
+                data_scope: command.data_scope,
+                description: trim_to_none(command.description),
+                sort: command.sort,
+                dept_check_strictly: command.dept_check_strictly,
+                dept_ids: custom_dept_ids(command.data_scope, command.dept_ids),
+                user_id,
+                now: Utc::now().naive_utc(),
+            })
+            .await?;
+        Ok(id)
+    }
+
+    pub async fn update(
+        &self,
+        user_id: i64,
+        id: i64,
+        command: RoleCommand,
+    ) -> Result<(), AppError> {
+        let command = normalize_role_command(command)?;
+        let existing = self.roles.get(id).await?.ok_or(AppError::NotFound)?;
+        if command.code != existing.code {
+            return Err(AppError::bad_request("角色编码不允许修改"));
+        }
+        if existing.is_system && command.data_scope != existing.data_scope {
+            return Err(AppError::bad_request(format!(
+                "[{}] 是系统内置角色，不允许修改角色数据权限",
+                existing.name
+            )));
+        }
+        ensure_unique_name(&self.roles, &command.name, Some(id)).await?;
+
+        self.roles
+            .update(&RoleUpdateRecord {
+                id,
+                name: command.name,
+                code: command.code,
+                data_scope: command.data_scope,
+                description: trim_to_none(command.description),
+                sort: command.sort,
+                dept_check_strictly: command.dept_check_strictly,
+                dept_ids: custom_dept_ids(command.data_scope, command.dept_ids),
+                user_id,
+                now: Utc::now().naive_utc(),
+            })
+            .await
+    }
+
+    pub async fn delete(&self, ids: Vec<i64>) -> Result<(), AppError> {
+        let ids = normalize_ids(ids);
+        if ids.is_empty() {
+            return Err(AppError::bad_request("ID 列表不能为空"));
+        }
+        if let Some(name) = self.roles.first_system_name(&ids).await? {
+            return Err(AppError::bad_request(format!(
+                "所选角色 [{name}] 是系统内置角色，不允许删除"
+            )));
+        }
+        if self.roles.has_users(&ids).await? {
+            return Err(AppError::bad_request(
+                "所选角色存在用户关联，请解除关联后重试",
+            ));
+        }
+
+        self.roles.delete_many(&ids).await
+    }
+
+    pub async fn update_permission(
+        &self,
+        user_id: i64,
+        id: i64,
+        command: RolePermissionCommand,
+    ) -> Result<(), AppError> {
+        self.roles
+            .update_permission(&RolePermissionRecord {
+                id,
+                menu_ids: normalize_ids(command.menu_ids),
+                menu_check_strictly: command.menu_check_strictly,
+                user_id,
+                now: Utc::now().naive_utc(),
+            })
+            .await
+    }
+
+    pub async fn user_ids(&self, id: i64) -> Result<Vec<i64>, AppError> {
+        if self.roles.get(id).await?.is_none() {
+            return Err(AppError::NotFound);
+        }
+        self.roles.user_ids(id).await
+    }
+}
+
+impl From<RoleRecord> for RoleResp {
+    fn from(record: RoleRecord) -> Self {
+        let disabled = record.is_system;
+        Self {
+            id: record.id,
+            name: record.name,
+            code: record.code,
+            sort: record.sort,
+            description: record.description,
+            data_scope: record.data_scope,
+            is_system: record.is_system,
+            create_user_string: record.create_user_string,
+            create_time: format_datetime(record.create_time),
+            update_user_string: record.update_user_string,
+            update_time: format_optional_datetime(record.update_time),
+            disabled,
+        }
+    }
+}
+
+fn normalize_role_command(mut command: RoleCommand) -> Result<RoleCommand, AppError> {
+    command.name = command.name.trim().to_owned();
+    command.code = command.code.trim().to_owned();
+    command.description = command.description.trim().to_owned();
+    if command.name.is_empty() {
+        return Err(AppError::bad_request("名称不能为空"));
+    }
+    if command.code.is_empty() {
+        return Err(AppError::bad_request("编码不能为空"));
+    }
+    ensure_max_chars("名称", &command.name, 30)?;
+    ensure_max_chars("编码", &command.code, 30)?;
+    ensure_max_chars("描述", &command.description, 200)?;
+    if command.sort <= 0 {
+        command.sort = 999;
+    }
+    if command.data_scope == 0 {
+        command.data_scope = 4;
+    }
+    if !(1..=5).contains(&command.data_scope) {
+        return Err(AppError::bad_request("数据权限范围不正确"));
+    }
+    command.dept_ids = normalize_ids(command.dept_ids);
+    Ok(command)
+}
+
+async fn ensure_unique_name(
+    repository: &SystemRoleRepository,
+    name: &str,
+    exclude_id: Option<i64>,
+) -> Result<(), AppError> {
+    if repository.name_exists(name, exclude_id).await? {
+        return Err(AppError::bad_request(format!("保存失败，[{name}] 已存在")));
+    }
+    Ok(())
+}
+
+async fn ensure_unique_code(
+    repository: &SystemRoleRepository,
+    code: &str,
+    exclude_id: Option<i64>,
+) -> Result<(), AppError> {
+    if repository.code_exists(code, exclude_id).await? {
+        return Err(AppError::bad_request(format!("保存失败，[{code}] 已存在")));
+    }
+    Ok(())
+}
+
+fn custom_dept_ids(data_scope: i16, dept_ids: Vec<i64>) -> Vec<i64> {
+    if data_scope == 5 {
+        dept_ids
+    } else {
+        vec![]
+    }
+}
+
+fn normalize_ids(ids: Vec<i64>) -> Vec<i64> {
+    let mut ids = ids.into_iter().filter(|id| *id > 0).collect::<Vec<_>>();
+    ids.sort_unstable();
+    ids.dedup();
+    ids
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_command_rejects_name_that_exceeds_database_limit() {
+        let command = RoleCommand {
+            name: "x".repeat(31),
+            code: "role_code".to_owned(),
+            sort: 1,
+            description: String::new(),
+            data_scope: 4,
+            dept_ids: vec![],
+            dept_check_strictly: true,
+        };
+
+        assert!(matches!(
+            normalize_role_command(command),
+            Err(AppError::BadRequest(_))
+        ));
+    }
+}

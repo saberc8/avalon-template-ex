@@ -18,10 +18,12 @@ use crate::{
 };
 
 pub mod auth;
+pub mod common;
 pub mod extractor;
 pub mod middleware {
     pub mod permission;
 }
+pub mod system;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -40,6 +42,10 @@ pub fn build_router(
         .route("/health", get(health))
         .route("/ready", get(ready))
         .merge(auth::routes())
+        .merge(common::routes())
+        .merge(system::dept::routes())
+        .merge(system::menu::routes())
+        .merge(system::role::routes())
         .with_state(AppState { db, jwt })
         .layer(cors)
         .layer(TraceLayer::new_for_http()))
