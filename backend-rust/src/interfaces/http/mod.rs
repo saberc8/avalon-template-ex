@@ -3,7 +3,7 @@ use axum::{
     body::Body,
     extract::State,
     http::{header, HeaderName, HeaderValue, Method, Request, StatusCode},
-    middleware::{from_fn, Next},
+    middleware::{from_fn, from_fn_with_state, Next},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -21,11 +21,14 @@ use crate::{
 };
 
 pub mod auth;
+pub mod captcha;
 pub mod common;
 pub mod extractor;
 pub mod middleware {
+    pub mod access_log;
     pub mod permission;
 }
+pub mod monitor;
 pub mod system;
 pub mod user_profile;
 
@@ -41,12 +44,16 @@ pub fn build_router(
     jwt: JwtService,
 ) -> Result<Router> {
     let cors = cors_layer(cors_allowed_origins)?;
+    let state = AppState { db, jwt };
 
     Ok(Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
         .merge(auth::routes())
+        .merge(captcha::routes())
         .merge(common::routes())
+        .merge(monitor::log::routes())
+        .merge(monitor::online::routes())
         .merge(system::dept::routes())
         .merge(system::dict::routes())
         .merge(system::file::routes())
@@ -59,9 +66,13 @@ pub fn build_router(
         .merge(user_profile::routes())
         .nest_service("/file", ServeDir::new("data/file"))
         .fallback(not_found)
-        .with_state(AppState { db, jwt })
+        .with_state(state.clone())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(from_fn_with_state(
+            state,
+            middleware::access_log::record_access_log,
+        ))
         .layer(from_fn(vue_failure_envelope)))
 }
 

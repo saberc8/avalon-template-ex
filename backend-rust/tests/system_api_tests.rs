@@ -340,6 +340,11 @@ async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth
         "/common/dict/user",
         "/common/dict/role",
         "/common/dict/user_status",
+        "/system/log",
+        "/system/log/1",
+        "/system/log/export/login",
+        "/system/log/export/operation",
+        "/monitor/online",
         "/user/profile/social",
     ] {
         let response = app
@@ -383,6 +388,7 @@ async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth
         ("DELETE", "/system/file"),
         ("POST", "/system/file/dir"),
         ("POST", "/common/file"),
+        ("DELETE", "/monitor/online/test-token"),
     ] {
         let response = app
             .clone()

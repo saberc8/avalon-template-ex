@@ -1,5 +1,6 @@
 use axum::{
     extract::State,
+    http::HeaderMap,
     routing::{get, post},
     Json, Router,
 };
@@ -7,10 +8,16 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    application::auth::service::{AuthService, CurrentUserDetails, LoginCommand, LoginResult},
+    application::auth::service::{
+        AuthService, CurrentUserDetails, LoginCommand, LoginMeta, LoginResult,
+    },
+    application::monitor::online_service::OnlineService,
     application::rbac::service::RbacService,
     domain::auth::model::{CurrentUser, RoleContext},
     domain::rbac::model::RouteItem,
+    interfaces::http::middleware::access_log::{
+        bearer_token_value, browser_name, client_ip, os_name,
+    },
     shared::{error::AppError, response::ApiResponse},
 };
 
@@ -71,16 +78,30 @@ struct UserInfoResp {
 
 async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<LoginReq>,
 ) -> Result<Json<ApiResponse<LoginResp>>, AppError> {
     let service = AuthService::new(state.db, state.jwt);
-    let result = service.login(req.into()).await?;
+    let meta = LoginMeta {
+        ip: client_ip(&headers),
+        browser: browser_name(&headers),
+        os: os_name(&headers),
+    };
+    let result = service.login(req.into(), meta).await?;
 
     Ok(Json(ApiResponse::ok(LoginResp::from(result))))
 }
 
-async fn logout(_current_user: CurrentUser) -> Json<ApiResponse<()>> {
-    Json(ApiResponse::ok(()))
+async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    _current_user: CurrentUser,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    if let Some(token) = bearer_token_value(&headers) {
+        OnlineService::new(state.db).kickout(token).await?;
+    }
+
+    Ok(Json(ApiResponse::ok(())))
 }
 
 async fn user_info(

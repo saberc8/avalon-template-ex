@@ -2,8 +2,13 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use crate::{
+    application::monitor::{
+        log_service::{build_log_record, LogRecordInput, LOGIN_LOG_TYPE},
+        online_service::{OnlineLoginCommand, OnlineService},
+    },
     domain::auth::model::{RoleContext, UserAccount},
     infrastructure::{
+        persistence::log_repository::LogRepository,
         persistence::user_repository::UserRepository,
         security::{jwt::JwtService, password::verify_password},
     },
@@ -31,6 +36,13 @@ pub struct LoginResult {
     pub expire: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct LoginMeta {
+    pub ip: String,
+    pub browser: String,
+    pub os: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct CurrentUserDetails {
     pub user: UserAccount,
@@ -40,6 +52,7 @@ pub struct CurrentUserDetails {
 
 #[derive(Debug, Clone)]
 pub struct AuthService {
+    db: PgPool,
     users: UserRepository,
     jwt: JwtService,
 }
@@ -47,12 +60,17 @@ pub struct AuthService {
 impl AuthService {
     pub fn new(db: PgPool, jwt: JwtService) -> Self {
         Self {
-            users: UserRepository::new(db),
+            users: UserRepository::new(db.clone()),
+            db,
             jwt,
         }
     }
 
-    pub async fn login(&self, command: LoginCommand) -> Result<LoginResult, AppError> {
+    pub async fn login(
+        &self,
+        command: LoginCommand,
+        meta: LoginMeta,
+    ) -> Result<LoginResult, AppError> {
         ensure_account_auth_type(command.auth_type.as_deref())?;
 
         let (username, password) = login_credentials(&command)?;
@@ -73,6 +91,8 @@ impl AuthService {
         }
 
         let issued = self.jwt.issue_with_expire(user.id, &user.username)?;
+        self.record_successful_login(&user, &command, &issued.token, &meta)
+            .await?;
         Ok(LoginResult {
             token: issued.token,
             expire: issued.expire,
@@ -95,6 +115,52 @@ impl AuthService {
             roles,
             permissions,
         })
+    }
+
+    async fn record_successful_login(
+        &self,
+        user: &UserAccount,
+        command: &LoginCommand,
+        token: &str,
+        meta: &LoginMeta,
+    ) -> Result<(), AppError> {
+        OnlineService::new(self.db.clone())
+            .save_login(
+                user,
+                OnlineLoginCommand {
+                    token: token.to_owned(),
+                    client_type: "PC".to_owned(),
+                    client_id: command
+                        .client_id
+                        .clone()
+                        .unwrap_or_else(|| "default".to_owned()),
+                    ip: meta.ip.clone(),
+                    browser: meta.browser.clone(),
+                    os: meta.os.clone(),
+                },
+            )
+            .await?;
+
+        let record = build_log_record(LogRecordInput {
+            description: "账号登录",
+            module: "登录",
+            log_type: LOGIN_LOG_TYPE,
+            request_url: "/auth/login",
+            request_method: "POST",
+            request_headers: "{}",
+            request_body: "[redacted]",
+            status_code: 200,
+            response_headers: "{}",
+            response_body: "",
+            time_taken: 0,
+            ip: &meta.ip,
+            browser: &meta.browser,
+            os: &meta.os,
+            status: 1,
+            error_msg: "",
+            create_user: Some(user.id),
+        });
+        LogRepository::new(self.db.clone()).insert(&record).await
     }
 }
 
