@@ -99,7 +99,7 @@ mod tests {
         http::{header, Method, Request, StatusCode},
     };
     use http_body_util::BodyExt;
-    use serde_json::{json, Value};
+    use serde_json::Value;
     use sqlx::postgres::PgPoolOptions;
     use tower::ServiceExt;
 
@@ -137,7 +137,11 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = serde_json::from_slice::<Value>(&body).unwrap();
-        assert_eq!(body, json!({"code": "200", "msg": "成功", "data": "ok"}));
+        assert_eq!(body["code"], "200");
+        assert_eq!(body["msg"], "成功");
+        assert_eq!(body["data"], "ok");
+        assert_eq!(body["success"], true);
+        assert!(body["timestamp"].as_str().unwrap().parse::<i64>().is_ok());
     }
 
     #[tokio::test]
@@ -158,13 +162,14 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = serde_json::from_slice::<Value>(&body).unwrap();
-        assert_eq!(
-            body,
-            json!({"code": "500", "msg": "系统异常，请稍后重试", "data": null})
-        );
+        assert_eq!(body["code"], "500");
+        assert_eq!(body["msg"], "系统异常，请稍后重试");
+        assert_eq!(body["data"], Value::Null);
+        assert_eq!(body["success"], false);
+        assert!(body["timestamp"].as_str().unwrap().parse::<i64>().is_ok());
     }
 
     #[tokio::test]

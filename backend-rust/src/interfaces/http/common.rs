@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     application::system::{
-        dept_service::{DeptQuery, DeptResp, DeptService},
+        dept_service::{DeptResp, DeptService},
         menu_service::{MenuQuery, MenuResp, MenuService},
     },
     domain::auth::model::CurrentUser,
@@ -31,11 +31,10 @@ pub struct CommonTreeNode {
 
 async fn dept_tree(
     State(state): State<AppState>,
-    current_user: CurrentUser,
-    axum::extract::Query(query): axum::extract::Query<DeptQuery>,
+    _current_user: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<CommonTreeNode>>>, AppError> {
     let service = DeptService::new(state.db);
-    let tree = service.tree(&current_user, query).await?;
+    let tree = service.common_tree().await?;
 
     Ok(Json(ApiResponse::ok(
         tree.into_iter().map(CommonTreeNode::from).collect(),
@@ -62,7 +61,7 @@ impl From<DeptResp> for CommonTreeNode {
             id: dept.id,
             title: dept.name.clone(),
             name: dept.name,
-            disabled: dept.status != 1,
+            disabled: false,
             children: dept
                 .children
                 .into_iter()

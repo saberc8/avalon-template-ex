@@ -1,6 +1,8 @@
 use axum::{
     body::Body,
     http::{Request, StatusCode},
+    routing::get,
+    Json, Router,
 };
 use backend_rust::{
     application::system::{
@@ -10,6 +12,7 @@ use backend_rust::{
     },
     infrastructure::security::jwt::JwtService,
     interfaces::http::{build_router, common::CommonTreeNode},
+    shared::response::ApiResponse,
 };
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -183,6 +186,13 @@ mod system {
             assert_eq!(value["disabled"], false);
             assert_eq!(value["children"][0]["id"], 2);
         }
+
+        #[test]
+        fn system_common_dept_tree_nodes_are_never_disabled_for_vue_parity() {
+            let node = CommonTreeNode::from(dept_with_status(1, 0, "禁用部门", 2));
+
+            assert!(!node.disabled);
+        }
     }
 }
 
@@ -212,13 +222,108 @@ async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{uri}");
+        assert_eq!(response.status(), StatusCode::OK, "{uri}");
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = serde_json::from_slice::<Value>(&body).unwrap();
-        assert_eq!(
-            body,
-            json!({"code": "401", "msg": "未授权，请重新登录", "data": null}),
-            "{uri}"
-        );
+        assert_eq!(body["code"], "401", "{uri}");
+        assert_eq!(body["msg"], "未授权，请重新登录", "{uri}");
+        assert_eq!(body["data"], Value::Null, "{uri}");
+        assert_eq!(body["success"], false, "{uri}");
+        assert_epoch_millis_timestamp(&body, uri);
     }
+}
+
+#[tokio::test]
+async fn success_path_api_compatibility_fixture_routes_include_vue_envelope_and_keys() {
+    let app = Router::new()
+        .route("/common/tree/dept", get(fixture_common_dept_tree))
+        .route("/common/tree/menu", get(fixture_common_menu_tree))
+        .route("/system/dept/tree", get(fixture_system_dept_tree))
+        .route("/system/menu/tree", get(fixture_system_menu_tree))
+        .route("/system/role/list", get(fixture_system_role_list));
+
+    let cases = [
+        ("/common/tree/dept", vec!["id", "name", "children"]),
+        ("/common/tree/menu", vec!["id", "name", "children"]),
+        ("/system/dept/tree", vec!["id", "name", "children"]),
+        ("/system/menu/tree", vec!["id", "title", "children"]),
+        ("/system/role/list", vec!["id", "dataScope"]),
+    ];
+
+    for (uri, keys) in cases {
+        let response = app
+            .clone()
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK, "{uri}");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = serde_json::from_slice::<Value>(&body).unwrap();
+        assert_eq!(body["code"], "200", "{uri}");
+        assert_eq!(body["success"], true, "{uri}");
+        assert_epoch_millis_timestamp(&body, uri);
+
+        let first = &body["data"][0];
+        for key in keys {
+            assert!(first.get(key).is_some(), "{uri} missing {key}");
+        }
+    }
+}
+
+fn dept_with_status(id: i64, parent_id: i64, name: &str, status: i16) -> DeptResp {
+    DeptResp {
+        status,
+        ..dept(id, parent_id, name)
+    }
+}
+
+fn assert_epoch_millis_timestamp(body: &Value, context: &str) {
+    let timestamp = body["timestamp"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{context} timestamp must be a string"));
+    assert!(timestamp.parse::<i64>().is_ok(), "{context} timestamp");
+}
+
+async fn fixture_common_dept_tree() -> Json<ApiResponse<Vec<CommonTreeNode>>> {
+    Json(ApiResponse::ok(vec![CommonTreeNode::from(dept(
+        1, 0, "总部",
+    ))]))
+}
+
+async fn fixture_common_menu_tree() -> Json<ApiResponse<Vec<CommonTreeNode>>> {
+    Json(ApiResponse::ok(vec![CommonTreeNode::from(menu(
+        10,
+        0,
+        "系统管理",
+    ))]))
+}
+
+async fn fixture_system_dept_tree() -> Json<ApiResponse<Vec<DeptResp>>> {
+    Json(ApiResponse::ok(build_dept_tree(vec![dept(1, 0, "总部")])))
+}
+
+async fn fixture_system_menu_tree() -> Json<ApiResponse<Vec<MenuResp>>> {
+    Json(ApiResponse::ok(build_menu_tree(vec![menu(
+        10,
+        0,
+        "系统管理",
+    )])))
+}
+
+async fn fixture_system_role_list() -> Json<ApiResponse<Vec<RoleResp>>> {
+    Json(ApiResponse::ok(vec![RoleResp {
+        id: 1,
+        name: "系统管理员".to_owned(),
+        code: "admin".to_owned(),
+        sort: 1,
+        description: String::new(),
+        data_scope: 1,
+        is_system: true,
+        create_user_string: "admin".to_owned(),
+        create_time: "2026-05-29 10:00:00".to_owned(),
+        update_user_string: String::new(),
+        update_time: String::new(),
+        disabled: true,
+    }]))
 }

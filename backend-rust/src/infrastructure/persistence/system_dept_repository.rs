@@ -85,6 +85,16 @@ impl SystemDeptRepository {
         Ok(records)
     }
 
+    pub async fn list_all_for_common_tree(&self) -> Result<Vec<DeptRecord>, AppError> {
+        let mut query = QueryBuilder::<Postgres>::new(dept_select_sql());
+        query.push(" ORDER BY d.sort ASC, d.id ASC");
+
+        Ok(query
+            .build_query_as::<DeptRecord>()
+            .fetch_all(&self.db)
+            .await?)
+    }
+
     pub async fn get(&self, id: i64) -> Result<Option<DeptRecord>, AppError> {
         let mut query = QueryBuilder::<Postgres>::new(dept_select_sql());
         query.push(" WHERE d.id = ").push_bind(id).push(" LIMIT 1");

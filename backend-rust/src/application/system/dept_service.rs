@@ -116,6 +116,14 @@ impl DeptService {
         Ok(records.into_iter().map(DeptResp::from).collect())
     }
 
+    pub async fn common_tree(&self) -> Result<Vec<DeptResp>, AppError> {
+        let records = self.depts.list_all_for_common_tree().await?;
+
+        Ok(build_dept_tree(
+            records.into_iter().map(DeptResp::from).collect(),
+        ))
+    }
+
     pub async fn get(&self, id: i64) -> Result<DeptResp, AppError> {
         self.depts
             .get(id)

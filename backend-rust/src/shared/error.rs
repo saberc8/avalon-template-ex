@@ -43,17 +43,6 @@ impl AppError {
         }
     }
 
-    fn status(&self) -> StatusCode {
-        match self {
-            Self::BadRequest(_) => StatusCode::BAD_REQUEST,
-            Self::Unauthorized => StatusCode::UNAUTHORIZED,
-            Self::Forbidden => StatusCode::FORBIDDEN,
-            Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => StatusCode::NOT_FOUND,
-            Self::Conflict(_) => StatusCode::CONFLICT,
-            Self::Sqlx(_) | Self::Anyhow(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-
     fn client_message(&self) -> &str {
         match self {
             Self::BadRequest(message) => message,
@@ -73,7 +62,6 @@ impl AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        let status = self.status();
         let code = self.code();
         let message = self.client_message();
 
@@ -82,7 +70,7 @@ impl IntoResponse for AppError {
         }
 
         let body = Json(ApiResponse::fail(code, message));
-        (status, body).into_response()
+        (StatusCode::OK, body).into_response()
     }
 }
 
@@ -108,8 +96,9 @@ mod tests {
         )))
         .await;
 
-        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(status, StatusCode::OK);
         assert_eq!(body.code, "500");
+        assert!(!body.success);
         assert_ne!(body.msg, "secret sql detail");
         assert!(!body.msg.contains("secret sql detail"));
     }
@@ -119,8 +108,9 @@ mod tests {
         let (status, body) =
             response_body(AppError::Anyhow(anyhow::anyhow!("secret anyhow detail"))).await;
 
-        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(status, StatusCode::OK);
         assert_eq!(body.code, "500");
+        assert!(!body.success);
         assert_ne!(body.msg, "secret anyhow detail");
         assert!(!body.msg.contains("secret anyhow detail"));
     }
@@ -129,8 +119,9 @@ mod tests {
     async fn row_not_found_maps_to_not_found_response() {
         let (status, body) = response_body(AppError::Sqlx(sqlx::Error::RowNotFound)).await;
 
-        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(status, StatusCode::OK);
         assert_eq!(body.code, "404");
+        assert!(!body.success);
         assert_eq!(body.msg, "请求的资源不存在");
     }
 }

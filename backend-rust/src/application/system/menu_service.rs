@@ -101,7 +101,7 @@ impl MenuService {
             .menus
             .list(&MenuListFilter {
                 title: query.title_filter().as_deref(),
-                status: query.status,
+                status: query.status_filter(),
                 only_catalog_and_menu: false,
             })
             .await?;
@@ -116,7 +116,7 @@ impl MenuService {
             .menus
             .list(&MenuListFilter {
                 title: query.title_filter().as_deref(),
-                status: query.status,
+                status: query.status_filter(),
                 only_catalog_and_menu: true,
             })
             .await?;
@@ -238,11 +238,11 @@ impl MenuService {
 
 impl MenuQuery {
     fn title_filter(&self) -> Option<String> {
-        self.title
-            .as_ref()
-            .or(self.description.as_ref())
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty())
+        None
+    }
+
+    fn status_filter(&self) -> Option<i16> {
+        None
     }
 }
 
@@ -411,5 +411,17 @@ mod tests {
             normalize_menu_command(command),
             Err(AppError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn menu_tree_query_filter_is_ignored_for_vue_parity() {
+        let query = MenuQuery {
+            title: Some("missing".to_owned()),
+            description: Some("also-missing".to_owned()),
+            status: Some(2),
+        };
+
+        assert!(query.title_filter().is_none());
+        assert!(query.status_filter().is_none());
     }
 }
