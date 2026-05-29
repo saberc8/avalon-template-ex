@@ -101,4 +101,40 @@ mod tests {
         assert_eq!(claims.user_id, 1);
         assert_eq!(claims.username, "admin");
     }
+
+    #[tokio::test]
+    async fn expired_token_is_rejected() {
+        let secret = "local-dev-only-change-this-secret-32chars-min";
+        let claims = TokenClaims {
+            user_id: 1,
+            username: "admin".to_owned(),
+            iat: (Utc::now() - Duration::hours(2)).timestamp() as usize,
+            exp: (Utc::now() - Duration::hours(1)).timestamp() as usize,
+        };
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+        let service = JwtService::new(secret.to_owned(), 24);
+
+        let err = service.parse(&format!("Bearer {token}")).unwrap_err();
+
+        assert!(err.to_string().contains("parse JWT"));
+    }
+
+    #[tokio::test]
+    async fn token_signed_with_wrong_secret_is_rejected() {
+        let issuer = JwtService::new(
+            "local-dev-only-change-this-secret-32chars-min".to_owned(),
+            24,
+        );
+        let parser = JwtService::new("another-local-dev-only-secret-32chars-min".to_owned(), 24);
+        let token = issuer.issue(1, "admin").unwrap();
+
+        let err = parser.parse(&format!("Bearer {token}")).unwrap_err();
+
+        assert!(err.to_string().contains("parse JWT"));
+    }
 }

@@ -55,14 +55,7 @@ impl AuthService {
     pub async fn login(&self, command: LoginCommand) -> Result<LoginResult, AppError> {
         ensure_account_auth_type(command.auth_type.as_deref())?;
 
-        let username = command.username.trim();
-        let password = command.password.trim();
-        if username.is_empty() {
-            return Err(AppError::bad_request("用户名不能为空"));
-        }
-        if password.is_empty() {
-            return Err(AppError::bad_request("密码不能为空"));
-        }
+        let (username, password) = login_credentials(&command)?;
 
         let Some(user) = self.users.find_by_username(username).await? else {
             return Err(AppError::bad_request(INVALID_CREDENTIALS_MESSAGE));
@@ -114,6 +107,19 @@ fn ensure_account_auth_type(auth_type: Option<&str>) -> Result<(), AppError> {
     Err(AppError::bad_request("暂不支持该认证方式"))
 }
 
+fn login_credentials(command: &LoginCommand) -> Result<(&str, &str), AppError> {
+    let username = command.username.trim();
+    let password = command.password.as_str();
+    if username.is_empty() {
+        return Err(AppError::bad_request("用户名不能为空"));
+    }
+    if password.is_empty() {
+        return Err(AppError::bad_request("密码不能为空"));
+    }
+
+    Ok((username, password))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,5 +137,23 @@ mod tests {
 
         assert!(matches!(err, AppError::BadRequest(_)));
         assert_eq!(err.to_string(), "暂不支持该认证方式");
+    }
+
+    #[test]
+    fn login_input_keeps_password_exactly_as_supplied() {
+        let command = LoginCommand {
+            username: " admin ".to_owned(),
+            password: " admin123 ".to_owned(),
+            auth_type: None,
+            client_id: None,
+            captcha: None,
+            captcha_key: None,
+            uuid: None,
+        };
+
+        let (username, password) = login_credentials(&command).unwrap();
+
+        assert_eq!(username, "admin");
+        assert_eq!(password, " admin123 ");
     }
 }

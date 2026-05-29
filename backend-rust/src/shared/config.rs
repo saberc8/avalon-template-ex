@@ -4,6 +4,8 @@ use anyhow::{bail, Context, Result};
 
 const DEFAULT_CORS_ALLOWED_ORIGINS: &str =
     "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173";
+const JWT_SECRET_PLACEHOLDER: &str = "dev-only-change-me";
+const JWT_SECRET_MIN_LEN: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -36,8 +38,8 @@ impl AppConfig {
             &env::var("CORS_ALLOWED_ORIGINS")
                 .unwrap_or_else(|_| DEFAULT_CORS_ALLOWED_ORIGINS.to_owned()),
         );
-        let auth_jwt_secret =
-            env::var("AUTH_JWT_SECRET").unwrap_or_else(|_| "dev-only-change-me".to_owned());
+        let auth_jwt_secret_raw = env::var("AUTH_JWT_SECRET").ok();
+        let auth_jwt_secret = parse_auth_jwt_secret(auth_jwt_secret_raw.as_deref())?;
         let auth_jwt_ttl_hours = parse_positive_u64_env(
             "AUTH_JWT_TTL_HOURS",
             &env::var("AUTH_JWT_TTL_HOURS").unwrap_or_else(|_| "24".to_owned()),
@@ -104,6 +106,25 @@ fn parse_positive_u64_env(name: &str, raw: &str) -> Result<u64> {
     Ok(value)
 }
 
+fn parse_auth_jwt_secret(raw: Option<&str>) -> Result<String> {
+    let Some(raw) = raw else {
+        bail!("AUTH_JWT_SECRET must be set");
+    };
+    let secret = raw.trim();
+
+    if secret.is_empty() {
+        bail!("AUTH_JWT_SECRET must not be empty");
+    }
+    if secret == JWT_SECRET_PLACEHOLDER {
+        bail!("AUTH_JWT_SECRET must not use the placeholder value");
+    }
+    if secret.len() < JWT_SECRET_MIN_LEN {
+        bail!("AUTH_JWT_SECRET must be at least {JWT_SECRET_MIN_LEN} characters");
+    }
+
+    Ok(secret.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,5 +152,41 @@ mod tests {
         let err = parse_positive_u64_env("AUTH_JWT_TTL_HOURS", "0").unwrap_err();
 
         assert!(err.to_string().contains("positive"));
+    }
+
+    #[test]
+    fn jwt_secret_rejects_missing_value() {
+        let err = parse_auth_jwt_secret(None).unwrap_err();
+
+        assert!(err.to_string().contains("AUTH_JWT_SECRET"));
+    }
+
+    #[test]
+    fn jwt_secret_rejects_empty_value() {
+        let err = parse_auth_jwt_secret(Some("   ")).unwrap_err();
+
+        assert!(err.to_string().contains("AUTH_JWT_SECRET"));
+    }
+
+    #[test]
+    fn jwt_secret_rejects_placeholder_value() {
+        let err = parse_auth_jwt_secret(Some("dev-only-change-me")).unwrap_err();
+
+        assert!(err.to_string().contains("placeholder"));
+    }
+
+    #[test]
+    fn jwt_secret_rejects_short_value() {
+        let err = parse_auth_jwt_secret(Some("short-secret")).unwrap_err();
+
+        assert!(err.to_string().contains("at least 32"));
+    }
+
+    #[test]
+    fn jwt_secret_accepts_valid_value() {
+        let secret =
+            parse_auth_jwt_secret(Some("local-dev-only-change-this-secret-32chars-min")).unwrap();
+
+        assert_eq!(secret, "local-dev-only-change-this-secret-32chars-min");
     }
 }
