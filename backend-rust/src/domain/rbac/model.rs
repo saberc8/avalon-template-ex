@@ -4,7 +4,8 @@ use serde::Serialize;
 
 use crate::domain::auth::model::{CurrentUser, ADMIN_ROLE_CODE};
 
-const WILDCARD_PERMISSION: &str = "*";
+pub const ALL_PERMISSION: &str = "*:*:*";
+const LEGACY_WILDCARD_PERMISSION: &str = "*";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PermissionContext {
@@ -15,10 +16,11 @@ pub struct PermissionContext {
 impl PermissionContext {
     pub fn has(&self, permission: &str) -> bool {
         self.is_admin()
-            || self
-                .permissions
-                .iter()
-                .any(|existing| existing == WILDCARD_PERMISSION || existing == permission)
+            || self.permissions.iter().any(|existing| {
+                existing == ALL_PERMISSION
+                    || existing == LEGACY_WILDCARD_PERMISSION
+                    || existing == permission
+            })
     }
 
     pub fn is_admin(&self) -> bool {
@@ -131,7 +133,7 @@ pub fn build_route_tree(menus: Vec<Menu>, roles: Vec<String>) -> Vec<RouteItem> 
 
     let mut root_ids = menu_by_id
         .values()
-        .filter(|menu| menu.parent_id == 0 || !menu_by_id.contains_key(&menu.parent_id))
+        .filter(|menu| menu.parent_id == 0)
         .map(|menu| menu.id)
         .collect::<Vec<_>>();
     sort_menu_ids(&mut root_ids, &menu_by_id);
@@ -221,6 +223,16 @@ mod tests {
         let ctx = PermissionContext {
             role_codes: vec!["general".to_string()],
             permissions: vec!["*".to_string()],
+        };
+
+        assert!(ctx.has("system:user:delete"));
+    }
+
+    #[test]
+    fn java_wildcard_permission_has_all_permissions() {
+        let ctx = PermissionContext {
+            role_codes: vec!["general".to_string()],
+            permissions: vec!["*:*:*".to_string()],
         };
 
         assert!(ctx.has("system:user:delete"));
@@ -318,5 +330,31 @@ mod tests {
         assert_eq!(routes[0].children[0].children.len(), 1);
         assert_eq!(routes[0].children[0].children[0].id, 3);
         assert!(routes[0].children[0].children[0].children.is_empty());
+    }
+
+    #[test]
+    fn route_tree_does_not_promote_orphan_child_when_parent_is_missing() {
+        let routes = build_route_tree(
+            vec![Menu {
+                id: 2,
+                parent_id: 1,
+                title: "用户管理".to_string(),
+                menu_type: MenuType::Menu,
+                path: "/system/user".to_string(),
+                name: "SystemUser".to_string(),
+                component: "system/user/index".to_string(),
+                redirect: "".to_string(),
+                icon: "user".to_string(),
+                is_external: false,
+                is_cache: false,
+                is_hidden: false,
+                permission: "".to_string(),
+                sort: 1,
+                status: 1,
+            }],
+            vec!["general".to_string()],
+        );
+
+        assert!(routes.is_empty());
     }
 }

@@ -3,6 +3,7 @@ use sqlx::{FromRow, PgPool};
 
 use crate::{
     domain::auth::model::{CurrentUser, RoleContext, UserAccount},
+    domain::rbac::model::ALL_PERMISSION,
     shared::error::AppError,
 };
 
@@ -118,6 +119,7 @@ SELECT r.id, r.name, r.code, r.data_scope
 FROM sys_role AS r
 JOIN sys_user_role AS ur ON ur.role_id = r.id
 WHERE ur.user_id = $1
+  AND r.status = 1
 ORDER BY r.sort ASC, r.id ASC;
 "#,
         )
@@ -138,7 +140,9 @@ SELECT DISTINCT m.permission
 FROM sys_menu AS m
 JOIN sys_role_menu AS rm ON rm.menu_id = m.id
 JOIN sys_user_role AS ur ON ur.role_id = rm.role_id
+JOIN sys_role AS r ON r.id = ur.role_id
 WHERE ur.user_id = $1
+  AND r.status = 1
   AND m.status = 1
   AND m.permission IS NOT NULL
   AND m.permission <> ''
@@ -184,7 +188,7 @@ ORDER BY m.permission ASC;
         roles: &[RoleContext],
     ) -> Result<Vec<String>, AppError> {
         if roles.iter().any(RoleContext::is_admin) {
-            return Ok(vec!["*".to_owned()]);
+            return Ok(vec![ALL_PERMISSION.to_owned()]);
         }
 
         self.permissions_by_user_id(user_id).await
@@ -220,5 +224,37 @@ impl From<RoleContextRow> for RoleContext {
             code: row.code,
             data_scope: row.data_scope,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::postgres::PgPoolOptions;
+
+    use super::*;
+
+    fn test_repository() -> UserRepository {
+        let db = PgPoolOptions::new()
+            .connect_lazy("postgres://postgres:postgres@localhost:5432/avalon_admin")
+            .unwrap();
+        UserRepository::new(db)
+    }
+
+    #[tokio::test]
+    async fn admin_permission_uses_java_wildcard() {
+        let permissions = test_repository()
+            .permissions_for_roles(
+                1,
+                &[RoleContext {
+                    id: 1,
+                    name: "系统管理员".to_string(),
+                    code: "admin".to_string(),
+                    data_scope: 1,
+                }],
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(permissions, vec!["*:*:*"]);
     }
 }
