@@ -12,20 +12,32 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use crate::shared::{error::AppError, response::ApiResponse};
+use crate::{
+    infrastructure::security::jwt::JwtService,
+    shared::{error::AppError, response::ApiResponse},
+};
+
+pub mod auth;
+pub mod extractor;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    pub jwt: JwtService,
 }
 
-pub fn build_router(db: PgPool, cors_allowed_origins: &[String]) -> Result<Router> {
+pub fn build_router(
+    db: PgPool,
+    cors_allowed_origins: &[String],
+    jwt: JwtService,
+) -> Result<Router> {
     let cors = cors_layer(cors_allowed_origins)?;
 
     Ok(Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
-        .with_state(AppState { db })
+        .merge(auth::routes())
+        .with_state(AppState { db, jwt })
         .layer(cors)
         .layer(TraceLayer::new_for_http()))
 }
@@ -90,9 +102,18 @@ mod tests {
             .unwrap()
     }
 
+    fn test_jwt() -> JwtService {
+        JwtService::new("test-secret".to_owned(), 24)
+    }
+
     #[tokio::test]
     async fn health_route_returns_success_envelope() {
-        let app = build_router(test_pool(), &["http://localhost:3000".to_owned()]).unwrap();
+        let app = build_router(
+            test_pool(),
+            &["http://localhost:3000".to_owned()],
+            test_jwt(),
+        )
+        .unwrap();
 
         let response = app
             .oneshot(
@@ -116,7 +137,7 @@ mod tests {
             .acquire_timeout(Duration::from_millis(100))
             .connect_lazy("postgres://postgres:postgres@127.0.0.1:1/avalon_admin")
             .unwrap();
-        let app = build_router(db, &["http://localhost:3000".to_owned()]).unwrap();
+        let app = build_router(db, &["http://localhost:3000".to_owned()], test_jwt()).unwrap();
 
         let response = app
             .oneshot(
@@ -139,7 +160,12 @@ mod tests {
 
     #[tokio::test]
     async fn cors_allows_configured_origins_only() {
-        let app = build_router(test_pool(), &["http://localhost:3000".to_owned()]).unwrap();
+        let app = build_router(
+            test_pool(),
+            &["http://localhost:3000".to_owned()],
+            test_jwt(),
+        )
+        .unwrap();
 
         let allowed = app
             .clone()

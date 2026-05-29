@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
 
 use backend_rust::{
-    infrastructure::db::init_pool, interfaces::http::build_router, shared::config::AppConfig,
+    infrastructure::{db::init_pool, security::jwt::JwtService},
+    interfaces::http::build_router,
+    shared::config::AppConfig,
 };
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -18,7 +20,8 @@ async fn main() -> anyhow::Result<()> {
         "postgres pool configured"
     );
 
-    let app = build_router(db, &config.cors_allowed_origins)?;
+    let jwt = JwtService::new(config.auth_jwt_secret.clone(), config.auth_jwt_ttl_hours);
+    let app = build_router(db, &config.cors_allowed_origins, jwt)?;
     let addr = SocketAddr::from(([0, 0, 0, 0], config.http_port));
     let listener = TcpListener::bind(addr).await?;
 

@@ -7,10 +7,16 @@ const INTERNAL_ERROR_MESSAGE: &str = "系统异常，请稍后重试";
 
 #[derive(Debug, Error)]
 pub enum AppError {
+    #[error("{0}")]
+    BadRequest(String),
+    #[error("未授权，请重新登录")]
+    Unauthorized,
     #[error("没有访问权限，请联系管理员授权")]
     Forbidden,
     #[error("请求的资源不存在")]
     NotFound,
+    #[error("{0}")]
+    Conflict(String),
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
     #[error(transparent)]
@@ -18,26 +24,43 @@ pub enum AppError {
 }
 
 impl AppError {
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        Self::BadRequest(message.into())
+    }
+
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::Conflict(message.into())
+    }
+
     fn code(&self) -> &'static str {
         match self {
+            Self::BadRequest(_) => "400",
+            Self::Unauthorized => "401",
             Self::Forbidden => "403",
             Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => "404",
+            Self::Conflict(_) => "409",
             Self::Sqlx(_) | Self::Anyhow(_) => "500",
         }
     }
 
     fn status(&self) -> StatusCode {
         match self {
+            Self::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => StatusCode::NOT_FOUND,
+            Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Sqlx(_) | Self::Anyhow(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
-    fn client_message(&self) -> &'static str {
+    fn client_message(&self) -> &str {
         match self {
+            Self::BadRequest(message) => message,
+            Self::Unauthorized => "未授权，请重新登录",
             Self::Forbidden => "没有访问权限，请联系管理员授权",
             Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => "请求的资源不存在",
+            Self::Conflict(message) => message,
             Self::Sqlx(_) | Self::Anyhow(_) => INTERNAL_ERROR_MESSAGE,
         }
     }

@@ -12,6 +12,8 @@ pub struct AppConfig {
     pub database_max_connections: u32,
     pub db_auto_migrate: bool,
     pub cors_allowed_origins: Vec<String>,
+    pub auth_jwt_secret: String,
+    pub auth_jwt_ttl_hours: u64,
 }
 
 impl AppConfig {
@@ -34,6 +36,12 @@ impl AppConfig {
             &env::var("CORS_ALLOWED_ORIGINS")
                 .unwrap_or_else(|_| DEFAULT_CORS_ALLOWED_ORIGINS.to_owned()),
         );
+        let auth_jwt_secret =
+            env::var("AUTH_JWT_SECRET").unwrap_or_else(|_| "dev-only-change-me".to_owned());
+        let auth_jwt_ttl_hours = parse_positive_u64_env(
+            "AUTH_JWT_TTL_HOURS",
+            &env::var("AUTH_JWT_TTL_HOURS").unwrap_or_else(|_| "24".to_owned()),
+        )?;
 
         if cors_allowed_origins.is_empty() {
             bail!("CORS_ALLOWED_ORIGINS must include at least one origin");
@@ -45,6 +53,8 @@ impl AppConfig {
             database_max_connections,
             db_auto_migrate,
             cors_allowed_origins,
+            auth_jwt_secret,
+            auth_jwt_ttl_hours,
         })
     }
 }
@@ -82,6 +92,18 @@ fn parse_bool_env(raw: Option<&str>, default: bool) -> Result<bool> {
     }
 }
 
+fn parse_positive_u64_env(name: &str, raw: &str) -> Result<u64> {
+    let value = raw
+        .parse::<u64>()
+        .with_context(|| format!("{name} must be a positive integer"))?;
+
+    if value == 0 {
+        bail!("{name} must be a positive integer");
+    }
+
+    Ok(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,5 +124,12 @@ mod tests {
     fn db_auto_migrate_accepts_true() {
         assert!(parse_bool_env(Some("true"), false).unwrap());
         assert!(parse_bool_env(Some("1"), false).unwrap());
+    }
+
+    #[test]
+    fn jwt_ttl_rejects_zero() {
+        let err = parse_positive_u64_env("AUTH_JWT_TTL_HOURS", "0").unwrap_err();
+
+        assert!(err.to_string().contains("positive"));
     }
 }
