@@ -189,3 +189,195 @@ export interface DeptCommand {
   status: number;
   description: string;
 }
+
+export interface DictResp {
+  id: number;
+  name: string;
+  code: string;
+  isSystem: boolean;
+  description: string;
+  createUserString: string;
+  createTime: string;
+  updateUserString: string;
+  updateTime: string;
+}
+
+export interface DictQuery {
+  description?: string;
+  sort?: string[];
+}
+
+export interface DictCommand {
+  name: string;
+  code: string;
+  description: string;
+}
+
+export interface DictItemResp {
+  id: number;
+  label: string;
+  value: string;
+  color: string;
+  sort: number;
+  description: string;
+  status: 1 | 2;
+  dictId: number;
+  createUserString: string;
+  createTime: string;
+  updateUserString: string;
+  updateTime: string;
+}
+
+export interface DictItemQuery extends PageQuery {
+  description?: string;
+  status?: number;
+  sort?: string[];
+  dictId?: number | string;
+}
+
+export interface DictItemCommand {
+  dictId: number;
+  label: string;
+  value: string;
+  color: string;
+  sort: number;
+  description: string;
+  status: number;
+}
+
+export interface FileItem {
+  id: number;
+  name: string;
+  originalName: string;
+  size: number;
+  url: string;
+  parentPath: string;
+  path: string;
+  sha256: string;
+  contentType: string;
+  metadata: string;
+  thumbnailSize: number;
+  thumbnailName: string;
+  thumbnailMetadata: string;
+  thumbnailUrl: string;
+  extension: string;
+  type: number;
+  storageId: number;
+  storageName: string;
+  createUserString: string;
+  createTime: string;
+  updateUserString: string;
+  updateTime: string;
+}
+
+export interface FileStatisticsResp {
+  type: string;
+  size: number;
+  number: number;
+  unit: string;
+  data: FileStatisticsResp[];
+}
+
+export interface FileDirCalcSizeResp {
+  size: number;
+}
+
+export interface FileQuery extends PageQuery {
+  originalName?: string;
+  type?: string;
+  parentPath?: string;
+  sort?: string[];
+}
+
+export interface OptionResp {
+  id: number;
+  name: string;
+  code: string;
+  value: string;
+  description: string;
+}
+
+export interface OptionQuery {
+  code?: string[];
+  category?: string;
+}
+
+export interface OptionUpdateItem {
+  id: number;
+  code: string;
+  value: unknown;
+}
+
+export interface StorageResp {
+  id: number;
+  name: string;
+  code: string;
+  type: number;
+  accessKey: string;
+  secretKey: string;
+  endpoint: string;
+  region: string;
+  bucketName: string;
+  domain: string;
+  description: string;
+  isDefault: boolean;
+  sort: number;
+  status: number;
+  createUserString: string;
+  createTime: string;
+  updateUserString: string;
+  updateTime: string;
+}
+
+export interface StorageQuery {
+  description?: string;
+  type?: number;
+  sort?: string[];
+}
+
+export interface StorageCommand {
+  name: string;
+  code: string;
+  type: number;
+  accessKey: string;
+  secretKey: string;
+  endpoint: string;
+  region: string;
+  bucketName: string;
+  domain: string;
+  description: string;
+  isDefault: boolean;
+  sort: number;
+  status: number;
+}
+
+export interface ClientResp {
+  id: number;
+  clientId: string;
+  clientType: string;
+  authType: string[];
+  activeTimeout: number;
+  timeout: number;
+  status: number;
+  createUser: number;
+  createTime: string;
+  updateUser: number;
+  updateTime: string;
+  createUserString: string;
+  updateUserString: string;
+}
+
+export interface ClientQuery extends PageQuery {
+  clientType?: string;
+  authType?: string[];
+  status?: number;
+  sort?: string[];
+}
+
+export interface ClientCommand {
+  clientType: string;
+  authType: string[];
+  activeTimeout: number;
+  timeout: number;
+  status: number;
+}
