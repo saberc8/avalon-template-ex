@@ -309,7 +309,7 @@ impl RoleService {
 
 impl From<RoleRecord> for RoleResp {
     fn from(record: RoleRecord) -> Self {
-        let disabled = record.is_system;
+        let disabled = record.is_system && record.code == "admin";
         Self {
             id: record.id,
             name: record.name,
@@ -433,6 +433,8 @@ fn default_size() -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use chrono::NaiveDate;
+
     use super::*;
 
     #[test]
@@ -454,6 +456,20 @@ mod tests {
     }
 
     #[test]
+    fn role_resp_disables_system_admin_role() {
+        let resp = RoleResp::from(role_record(1, "系统管理员", "admin", true));
+
+        assert!(resp.disabled);
+    }
+
+    #[test]
+    fn role_resp_keeps_system_general_role_enabled() {
+        let resp = RoleResp::from(role_record(2, "普通用户", "general", true));
+
+        assert!(!resp.disabled);
+    }
+
+    #[test]
     fn role_user_resp_disables_admin_system_user_association() {
         let resp = RoleUserResp::from(RoleUserRecord {
             id: 10,
@@ -472,5 +488,26 @@ mod tests {
         });
 
         assert!(resp.disabled);
+    }
+
+    fn role_record(id: i64, name: &str, code: &str, is_system: bool) -> RoleRecord {
+        RoleRecord {
+            id,
+            name: name.to_owned(),
+            code: code.to_owned(),
+            sort: i32::try_from(id).unwrap_or(999),
+            description: String::new(),
+            data_scope: 1,
+            is_system,
+            menu_check_strictly: true,
+            dept_check_strictly: true,
+            create_time: NaiveDate::from_ymd_opt(2026, 5, 29)
+                .unwrap()
+                .and_hms_opt(10, 0, 0)
+                .unwrap(),
+            create_user_string: "admin".to_owned(),
+            update_time: None,
+            update_user_string: String::new(),
+        }
     }
 }
