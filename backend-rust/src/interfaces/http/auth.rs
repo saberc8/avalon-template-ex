@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     application::auth::service::{AuthService, CurrentUserDetails, LoginCommand, LoginResult},
+    application::rbac::service::RbacService,
     domain::auth::model::{CurrentUser, RoleContext},
+    domain::rbac::model::RouteItem,
     shared::{error::AppError, response::ApiResponse},
 };
 
@@ -19,6 +21,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))
         .route("/auth/user/info", get(user_info))
+        .route("/auth/user/route", get(user_route))
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,6 +91,16 @@ async fn user_info(
     let details = service.current_user_details(current_user.id).await?;
 
     Ok(Json(ApiResponse::ok(UserInfoResp::from(details))))
+}
+
+async fn user_route(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+) -> Result<Json<ApiResponse<Vec<RouteItem>>>, AppError> {
+    let service = RbacService::new(state.db);
+    let routes = service.route_tree(&current_user).await?;
+
+    Ok(Json(ApiResponse::ok(routes)))
 }
 
 impl From<LoginReq> for LoginCommand {

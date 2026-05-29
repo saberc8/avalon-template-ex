@@ -19,6 +19,9 @@ use crate::{
 
 pub mod auth;
 pub mod extractor;
+pub mod middleware {
+    pub mod permission;
+}
 
 #[derive(Clone)]
 pub struct AppState {
