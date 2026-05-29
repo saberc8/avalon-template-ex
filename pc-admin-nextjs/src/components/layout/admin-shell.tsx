@@ -1,0 +1,47 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { HeaderBar } from "@/components/layout/header-bar";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+export function AdminShell({ children }: { children: ReactNode }) {
+  const { routes, loading, error, reload } = useCurrentUser();
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-muted/30">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          加载中
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+        <div className="w-full max-w-sm rounded-lg border bg-background p-5 text-center shadow-sm">
+          <div className="font-medium">加载失败</div>
+          <div className="mt-2 text-sm text-muted-foreground">{error}</div>
+          <Button className="mt-4" variant="outline" onClick={() => void reload()}>
+            重试
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen bg-muted/30">
+      <AppSidebar className="sticky top-0 hidden h-screen w-64 shrink-0 md:flex" routes={routes} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <HeaderBar />
+        <main className="min-w-0 flex-1 p-3 md:p-4">{children}</main>
+      </div>
+    </div>
+  );
+}
