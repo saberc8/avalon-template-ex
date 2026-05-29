@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use axum::{
     body::Body,
     extract::State,
-    http::{header, HeaderValue, Method, Request, StatusCode},
+    http::{header, HeaderName, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn, Next},
     response::{IntoResponse, Response},
     routing::get,
@@ -107,11 +107,23 @@ async fn vue_failure_envelope(request: Request<Body>, next: Next) -> Response {
     }
 
     let status = response.status();
-    Json(ApiResponse::fail(
+    let headers = response.headers().clone();
+    let mut wrapped = Json(ApiResponse::fail(
         status.as_u16().to_string(),
         fallback_message(status),
     ))
-    .into_response()
+    .into_response();
+    for (name, value) in headers.iter() {
+        if should_preserve_failure_header(name) {
+            wrapped.headers_mut().insert(name.clone(), value.clone());
+        }
+    }
+
+    wrapped
+}
+
+fn should_preserve_failure_header(name: &HeaderName) -> bool {
+    name != header::CONTENT_TYPE && name != header::CONTENT_LENGTH
 }
 
 fn fallback_message(status: StatusCode) -> &'static str {
@@ -266,6 +278,39 @@ mod tests {
         assert_eq!(body["data"], Value::Null);
         assert_eq!(body["success"], false);
         assert!(body["timestamp"].as_str().unwrap().parse::<i64>().is_ok());
+    }
+
+    #[tokio::test]
+    async fn wrapped_axum_rejection_preserves_cors_headers() {
+        let app = build_router(
+            test_pool(),
+            &["http://localhost:3000".to_owned()],
+            test_jwt(),
+        )
+        .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/auth/login")
+                    .header(header::ORIGIN, "http://localhost:3000")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("{"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
+            Some(&"http://localhost:3000".parse().unwrap())
+        );
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = serde_json::from_slice::<Value>(&body).unwrap();
+        assert_eq!(body["code"], "400");
+        assert_eq!(body["success"], false);
     }
 
     #[tokio::test]

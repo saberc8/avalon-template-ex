@@ -460,7 +460,7 @@ VALUES ($1, 'rust_role_assign_test', 'Rust角色分配测试', 0, 1, FALSE, 'rol
                 .uri("/system/role/2/user")
                 .header(header::AUTHORIZATION, format!("Bearer {token}"))
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(format!("[{test_user_id}]")))
+                .body(Body::from(format!("[\"{test_user_id}\", 0]")))
                 .unwrap(),
         )
         .await
@@ -495,7 +495,7 @@ VALUES ($1, 'rust_role_assign_test', 'Rust角色分配测试', 0, 1, FALSE, 'rol
                 .uri("/system/role/user")
                 .header(header::AUTHORIZATION, format!("Bearer {token}"))
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(format!("[{user_role_id}]")))
+                .body(Body::from(format!("[\"{user_role_id}\", 0]")))
                 .unwrap(),
         )
         .await
@@ -515,6 +515,104 @@ VALUES ($1, 'rust_role_assign_test', 'Rust角色分配测试', 0, 1, FALSE, 'rol
     let body = response_json(list_after_unassign).await;
     assert_eq!(body["code"], "200");
     assert_eq!(body["data"]["total"], 0);
+
+    cleanup_role_user_test_data(&db, test_user_id).await;
+}
+
+#[tokio::test]
+#[ignore = "requires migrated PostgreSQL seed data; run with DATABASE_URL pointing at a local test database"]
+async fn real_system_role_user_system_protection_blocks_admin_assignment_and_unassignment() {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/avalon_admin".to_owned());
+    let db = PgPoolOptions::new()
+        .connect(&database_url)
+        .await
+        .expect("connect to seeded PostgreSQL test database");
+    let test_user_id = 9_000_000_002_i64;
+    cleanup_role_user_test_data(&db, test_user_id).await;
+    sqlx::query(
+        r#"
+INSERT INTO sys_user (
+    id, username, nickname, gender, status, is_system, description,
+    dept_id, create_user, create_time
+)
+VALUES ($1, 'rust_admin_assign_block_test', 'Rust管理员分配保护测试', 0, 1, FALSE,
+        'admin assign protection test', 1, 1, NOW());
+"#,
+    )
+    .bind(test_user_id)
+    .execute(&db)
+    .await
+    .expect("insert temporary admin assignment protection user");
+
+    let admin_user_role_id = sqlx::query_scalar::<_, i64>(
+        r#"
+SELECT ur.id
+FROM sys_user_role AS ur
+JOIN sys_user AS u ON u.id = ur.user_id
+JOIN sys_role AS r ON r.id = ur.role_id
+WHERE u.is_system = TRUE
+  AND r.code = 'admin'
+LIMIT 1;
+"#,
+    )
+    .fetch_one(&db)
+    .await
+    .expect("seeded admin user role association should exist");
+
+    let jwt = test_jwt();
+    let token = jwt.issue(1, "admin").expect("issue test JWT");
+    let app = build_router(db.clone(), &["http://localhost:3000".to_owned()], jwt).unwrap();
+
+    let assign_admin = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/system/role/1/user")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("[\"{test_user_id}\"]")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = response_json(assign_admin).await;
+    assert_eq!(body["code"], "400");
+    assert_eq!(body["success"], false);
+
+    let assigned_admin_count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM sys_user_role WHERE role_id = 1 AND user_id = $1;",
+    )
+    .bind(test_user_id)
+    .fetch_one(&db)
+    .await
+    .expect("count temporary admin assignment");
+    assert_eq!(assigned_admin_count, 0);
+
+    let unassign_admin = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/system/role/user")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("[\"{admin_user_role_id}\"]")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = response_json(unassign_admin).await;
+    assert_eq!(body["code"], "400");
+    assert_eq!(body["success"], false);
+
+    let admin_relation_still_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sys_user_role WHERE id = $1);")
+            .bind(admin_user_role_id)
+            .fetch_one(&db)
+            .await
+            .expect("check protected admin relation still exists");
+    assert!(admin_relation_still_exists);
 
     cleanup_role_user_test_data(&db, test_user_id).await;
 }

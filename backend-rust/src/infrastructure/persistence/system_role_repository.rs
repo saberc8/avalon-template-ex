@@ -408,6 +408,32 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
         Ok(())
     }
 
+    pub async fn has_protected_admin_user_role(
+        &self,
+        user_role_ids: &[i64],
+    ) -> Result<bool, AppError> {
+        if user_role_ids.is_empty() {
+            return Ok(false);
+        }
+
+        Ok(sqlx::query_scalar::<_, bool>(
+            r#"
+SELECT EXISTS(
+    SELECT 1
+    FROM sys_user_role AS ur
+    JOIN sys_user AS u ON u.id = ur.user_id
+    JOIN sys_role AS r ON r.id = ur.role_id
+    WHERE ur.id = ANY($1)
+      AND u.is_system = TRUE
+      AND (r.id = 1 OR r.code = 'admin')
+);
+"#,
+        )
+        .bind(normalized_ids(user_role_ids))
+        .fetch_one(&self.db)
+        .await?)
+    }
+
     pub async fn unassign_user_roles(&self, user_role_ids: &[i64]) -> Result<(), AppError> {
         if user_role_ids.is_empty() {
             return Ok(());
@@ -457,12 +483,12 @@ SELECT
     u.dept_id,
     COALESCE(d.name, '') AS dept_name,
     COALESCE(
-        ARRAY_AGG(DISTINCT all_ur.role_id ORDER BY all_ur.role_id)
+        ARRAY_AGG(all_ur.role_id ORDER BY all_ur.role_id)
             FILTER (WHERE all_ur.role_id IS NOT NULL),
         ARRAY[]::BIGINT[]
     ) AS role_ids,
     COALESCE(
-        ARRAY_AGG(DISTINCT r.name ORDER BY r.name)
+        ARRAY_AGG(r.name ORDER BY all_ur.role_id)
             FILTER (WHERE r.name IS NOT NULL),
         ARRAY[]::TEXT[]
     ) AS role_names
@@ -552,4 +578,17 @@ fn normalized_ids(ids: &[i64]) -> Vec<i64> {
     ids.sort_unstable();
     ids.dedup();
     ids
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_user_select_sorts_role_ids_and_names_by_role_id() {
+        let sql = role_user_select_sql();
+
+        assert!(sql.contains("ARRAY_AGG(all_ur.role_id ORDER BY all_ur.role_id)"));
+        assert!(sql.contains("ARRAY_AGG(r.name ORDER BY all_ur.role_id)"));
+    }
 }

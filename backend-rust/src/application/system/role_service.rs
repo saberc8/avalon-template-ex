@@ -289,6 +289,8 @@ impl RoleService {
 
     pub async fn assign_users(&self, role_id: i64, user_ids: Vec<i64>) -> Result<(), AppError> {
         ensure_positive_role_id(role_id)?;
+        let role = self.roles.get(role_id).await?.ok_or(AppError::NotFound)?;
+        ensure_role_can_be_assigned(&role)?;
         let user_ids = normalize_ids(user_ids);
         if user_ids.is_empty() {
             return Err(AppError::bad_request("用户ID列表不能为空"));
@@ -302,6 +304,11 @@ impl RoleService {
         if user_role_ids.is_empty() {
             return Err(AppError::bad_request("用户角色ID列表不能为空"));
         }
+        ensure_admin_user_role_can_be_unassigned(
+            self.roles
+                .has_protected_admin_user_role(&user_role_ids)
+                .await?,
+        )?;
 
         self.roles.unassign_user_roles(&user_role_ids).await
     }
@@ -352,6 +359,20 @@ impl From<RoleUserRecord> for RoleUserResp {
 fn ensure_positive_role_id(role_id: i64) -> Result<(), AppError> {
     if role_id <= 0 {
         return Err(AppError::bad_request("ID 参数不正确"));
+    }
+    Ok(())
+}
+
+fn ensure_role_can_be_assigned(role: &RoleRecord) -> Result<(), AppError> {
+    if role.id == 1 || role.code == "admin" {
+        return Err(AppError::bad_request("系统管理员角色不允许分配"));
+    }
+    Ok(())
+}
+
+fn ensure_admin_user_role_can_be_unassigned(has_protected_role: bool) -> Result<(), AppError> {
+    if has_protected_role {
+        return Err(AppError::bad_request("系统管理员角色关联不允许取消分配"));
     }
     Ok(())
 }
@@ -467,6 +488,28 @@ mod tests {
         let resp = RoleResp::from(role_record(2, "普通用户", "general", true));
 
         assert!(!resp.disabled);
+    }
+
+    #[test]
+    fn admin_role_cannot_be_assigned_to_users() {
+        let err =
+            ensure_role_can_be_assigned(&role_record(1, "系统管理员", "admin", true)).unwrap_err();
+
+        assert!(matches!(err, AppError::BadRequest(_)));
+    }
+
+    #[test]
+    fn general_system_role_can_be_assigned_to_users() {
+        let result = ensure_role_can_be_assigned(&role_record(2, "普通用户", "general", true));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn protected_admin_user_role_cannot_be_unassigned() {
+        let err = ensure_admin_user_role_can_be_unassigned(true).unwrap_err();
+
+        assert!(matches!(err, AppError::BadRequest(_)));
     }
 
     #[test]

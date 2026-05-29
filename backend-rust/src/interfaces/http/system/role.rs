@@ -15,7 +15,7 @@ use crate::{
     shared::{error::AppError, pagination::PageResult, response::ApiResponse},
 };
 
-use super::{super::AppState, IdsReq};
+use super::{super::AppState, IdList, IdsReq};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -135,7 +135,7 @@ async fn assign_users(
     State(state): State<AppState>,
     current_user: CurrentUser,
     Path(id): Path<i64>,
-    Json(user_ids): Json<Vec<i64>>,
+    Json(IdList(user_ids)): Json<IdList>,
 ) -> Result<Json<ApiResponse<bool>>, AppError> {
     require_permission(&current_user, "system:role:assign")?;
     let service = RoleService::new(state.db);
@@ -147,7 +147,7 @@ async fn assign_users(
 async fn unassign_users(
     State(state): State<AppState>,
     current_user: CurrentUser,
-    Json(user_role_ids): Json<Vec<i64>>,
+    Json(IdList(user_role_ids)): Json<IdList>,
 ) -> Result<Json<ApiResponse<bool>>, AppError> {
     require_permission(&current_user, "system:role:unassign")?;
     let service = RoleService::new(state.db);
