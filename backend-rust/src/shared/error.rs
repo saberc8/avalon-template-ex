@@ -20,6 +20,8 @@ pub enum AppError {
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
     #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }
 
@@ -39,7 +41,7 @@ impl AppError {
             Self::Forbidden => "403",
             Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => "404",
             Self::Conflict(_) => "409",
-            Self::Sqlx(_) | Self::Anyhow(_) => "500",
+            Self::Sqlx(_) | Self::Io(_) | Self::Anyhow(_) => "500",
         }
     }
 
@@ -50,12 +52,12 @@ impl AppError {
             Self::Forbidden => "没有访问权限，请联系管理员授权",
             Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => "请求的资源不存在",
             Self::Conflict(message) => message,
-            Self::Sqlx(_) | Self::Anyhow(_) => INTERNAL_ERROR_MESSAGE,
+            Self::Sqlx(_) | Self::Io(_) | Self::Anyhow(_) => INTERNAL_ERROR_MESSAGE,
         }
     }
 
     fn should_log_internal(&self) -> bool {
-        matches!(self, Self::Sqlx(_) | Self::Anyhow(_))
+        matches!(self, Self::Sqlx(_) | Self::Io(_) | Self::Anyhow(_))
             && !matches!(self, Self::Sqlx(sqlx::Error::RowNotFound))
     }
 }

@@ -11,6 +11,7 @@ use axum::{
 use sqlx::PgPool;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
+    services::ServeDir,
     trace::TraceLayer,
 };
 
@@ -47,10 +48,16 @@ pub fn build_router(
         .merge(auth::routes())
         .merge(common::routes())
         .merge(system::dept::routes())
+        .merge(system::dict::routes())
+        .merge(system::file::routes())
+        .merge(system::client::routes())
         .merge(system::menu::routes())
+        .merge(system::option::routes())
         .merge(system::role::routes())
+        .merge(system::storage::routes())
         .merge(system::user::routes())
         .merge(user_profile::routes())
+        .nest_service("/file", ServeDir::new("data/file"))
         .fallback(not_found)
         .with_state(AppState { db, jwt })
         .layer(cors)

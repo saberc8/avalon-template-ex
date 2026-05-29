@@ -1,8 +1,13 @@
 use serde::{de, Deserialize, Deserializer};
 
+pub mod client;
 pub mod dept;
+pub mod dict;
+pub mod file;
 pub mod menu;
+pub mod option;
 pub mod role;
+pub mod storage;
 pub mod user;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
