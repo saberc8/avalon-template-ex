@@ -372,8 +372,8 @@ fn ensure_positive_role_id(role_id: i64) -> Result<(), AppError> {
 }
 
 fn ensure_role_can_be_assigned(role: &RoleRecord) -> Result<(), AppError> {
-    if role.id == 1 || role.code == "admin" {
-        return Err(AppError::bad_request("系统管理员角色不允许分配"));
+    if role.id <= 0 {
+        return Err(AppError::bad_request("ID 参数不正确"));
     }
     Ok(())
 }
@@ -499,11 +499,10 @@ mod tests {
     }
 
     #[test]
-    fn admin_role_cannot_be_assigned_to_users() {
-        let err =
-            ensure_role_can_be_assigned(&role_record(1, "系统管理员", "admin", true)).unwrap_err();
+    fn admin_role_can_be_assigned_to_users() {
+        let result = ensure_role_can_be_assigned(&role_record(1, "系统管理员", "admin", true));
 
-        assert!(matches!(err, AppError::BadRequest(_)));
+        assert!(result.is_ok());
     }
 
     #[test]
