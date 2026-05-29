@@ -37,7 +37,11 @@ pub struct OnlineUserQuery {
         deserialize_with = "crate::application::monitor::online_service::deserialize_string_vec"
     )]
     pub login_time: Vec<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
 }
 

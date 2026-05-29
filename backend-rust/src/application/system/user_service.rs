@@ -39,13 +39,25 @@ pub struct UserQuery {
     pub description: Option<String>,
     #[serde(default)]
     pub status: Option<i16>,
-    #[serde(default, alias = "createTime[]")]
+    #[serde(
+        default,
+        alias = "createTime[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub create_time: Vec<String>,
     #[serde(default)]
     pub dept_id: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
-    #[serde(default, alias = "userIds[]")]
+    #[serde(
+        default,
+        alias = "userIds[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub user_ids: Vec<String>,
     #[serde(default)]
     pub role_id: Option<String>,

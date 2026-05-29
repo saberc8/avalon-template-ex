@@ -22,7 +22,11 @@ use crate::{
 pub struct RoleQuery {
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
 }
 
@@ -35,7 +39,11 @@ pub struct RoleUserPageQuery {
     pub size: u64,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
 }
 

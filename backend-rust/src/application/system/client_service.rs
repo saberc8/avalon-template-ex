@@ -31,7 +31,11 @@ pub struct ClientQuery {
     pub auth_type: Vec<String>,
     #[serde(default)]
     pub status: Option<i16>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
 }
 

@@ -1,5 +1,6 @@
 use axum::{
     body::Body,
+    extract::Query,
     http::{header, Request, StatusCode},
     routing::get,
     Json, Router,
@@ -8,8 +9,8 @@ use backend_rust::{
     application::system::{
         dept_service::{build_dept_tree, DeptResp},
         menu_service::{build_menu_tree, MenuResp},
-        role_service::{RoleDetailResp, RoleResp, RoleUserResp},
-        user_service::{UserDetailResp, UserImportResp, UserResp},
+        role_service::{RoleDetailResp, RoleQuery, RoleResp, RoleUserResp},
+        user_service::{UserDetailResp, UserImportResp, UserQuery, UserResp},
     },
     application::user_profile_service::AvatarResp,
     infrastructure::security::jwt::JwtService,
@@ -75,6 +76,26 @@ fn menu(id: i64, parent_id: i64, title: &str) -> MenuResp {
 
 mod system {
     use super::*;
+
+    pub mod query {
+        use super::*;
+
+        #[test]
+        fn list_queries_accept_single_vector_query_params_from_nextjs() {
+            let uri = "/system/user?page=1&size=10&sort=id%2Cdesc&userIds=1"
+                .parse()
+                .unwrap();
+            let Query(user_query) = Query::<UserQuery>::try_from_uri(&uri).unwrap();
+
+            assert_eq!(user_query.sort, vec!["id,desc"]);
+            assert_eq!(user_query.user_ids, vec!["1"]);
+
+            let uri = "/system/role/list?sort=sort%2Casc".parse().unwrap();
+            let Query(role_query) = Query::<RoleQuery>::try_from_uri(&uri).unwrap();
+
+            assert_eq!(role_query.sort, vec!["sort,asc"]);
+        }
+    }
 
     pub mod dept {
         use super::*;

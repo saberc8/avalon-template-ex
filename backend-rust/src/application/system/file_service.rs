@@ -33,7 +33,11 @@ pub struct FileQuery {
     pub file_type: Option<String>,
     #[serde(default)]
     pub parent_path: Option<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
 }
 

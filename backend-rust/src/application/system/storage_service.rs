@@ -18,7 +18,11 @@ pub struct StorageQuery {
     pub description: Option<String>,
     #[serde(default, rename = "type")]
     pub storage_type: Option<i16>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "sort[]",
+        deserialize_with = "crate::shared::query::deserialize_string_vec"
+    )]
     pub sort: Vec<String>,
 }
 
