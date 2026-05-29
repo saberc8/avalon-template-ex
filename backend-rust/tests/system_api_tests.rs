@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    http::{Request, StatusCode},
+    http::{header, Request, StatusCode},
     routing::get,
     Json, Router,
 };
@@ -269,6 +269,44 @@ async fn success_path_api_compatibility_fixture_routes_include_vue_envelope_and_
             assert!(first.get(key).is_some(), "{uri} missing {key}");
         }
     }
+}
+
+#[tokio::test]
+#[ignore = "requires migrated PostgreSQL seed data; run with DATABASE_URL pointing at a local test database"]
+async fn real_system_role_list_success_path_uses_vue_envelope() {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/avalon_admin".to_owned());
+    let db = PgPoolOptions::new()
+        .connect(&database_url)
+        .await
+        .expect("connect to seeded PostgreSQL test database");
+    let jwt = test_jwt();
+    let token = jwt.issue(1, "admin").expect("issue test JWT");
+    let app = build_router(db, &["http://localhost:3000".to_owned()], jwt).unwrap();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/system/role/list")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body = serde_json::from_slice::<Value>(&body).unwrap();
+    assert_eq!(body["code"], "200");
+    assert_eq!(body["success"], true);
+    assert_epoch_millis_timestamp(&body, "/system/role/list");
+
+    let first = &body["data"][0];
+    assert!(first.get("id").is_some());
+    assert!(first.get("name").is_some());
+    assert!(first.get("code").is_some());
+    assert!(first.get("dataScope").is_some());
 }
 
 fn dept_with_status(id: i64, parent_id: i64, name: &str, status: i16) -> DeptResp {
