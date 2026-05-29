@@ -1,7 +1,8 @@
 use std::net::SocketAddr;
 
-use backend_rust::{interfaces::http::build_router, shared::config::AppConfig};
-use sqlx::postgres::PgPoolOptions;
+use backend_rust::{
+    infrastructure::db::init_pool, interfaces::http::build_router, shared::config::AppConfig,
+};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -11,12 +12,11 @@ async fn main() -> anyhow::Result<()> {
     init_tracing();
 
     let config = AppConfig::from_env()?;
-    let db = PgPoolOptions::new()
-        .max_connections(config.database_max_connections)
-        .connect_lazy(&config.database_url)?;
-
-    tracing::info!("postgres pool configured");
-    // Database migrations are added in the next backend task.
+    let db = init_pool(&config).await?;
+    tracing::info!(
+        db_auto_migrate = config.db_auto_migrate,
+        "postgres pool configured"
+    );
 
     let app = build_router(db, &config.cors_allowed_origins)?;
     let addr = SocketAddr::from(([0, 0, 0, 0], config.http_port));
