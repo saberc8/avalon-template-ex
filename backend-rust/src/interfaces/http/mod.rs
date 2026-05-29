@@ -26,6 +26,7 @@ pub mod middleware {
     pub mod permission;
 }
 pub mod system;
+pub mod user_profile;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -48,6 +49,8 @@ pub fn build_router(
         .merge(system::dept::routes())
         .merge(system::menu::routes())
         .merge(system::role::routes())
+        .merge(system::user::routes())
+        .merge(user_profile::routes())
         .fallback(not_found)
         .with_state(AppState { db, jwt })
         .layer(cors)

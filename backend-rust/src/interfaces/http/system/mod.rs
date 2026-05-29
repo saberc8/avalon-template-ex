@@ -3,6 +3,7 @@ use serde::{de, Deserialize, Deserializer};
 pub mod dept;
 pub mod menu;
 pub mod role;
+pub mod user;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdList(pub Vec<i64>);

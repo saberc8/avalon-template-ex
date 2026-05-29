@@ -9,7 +9,9 @@ use backend_rust::{
         dept_service::{build_dept_tree, DeptResp},
         menu_service::{build_menu_tree, MenuResp},
         role_service::{RoleDetailResp, RoleResp, RoleUserResp},
+        user_service::{UserDetailResp, UserImportResp, UserResp},
     },
+    application::user_profile_service::AvatarResp,
     infrastructure::security::jwt::JwtService,
     interfaces::http::{build_router, common::CommonTreeNode},
     shared::response::ApiResponse,
@@ -189,6 +191,78 @@ mod system {
         }
     }
 
+    pub mod user {
+        use super::*;
+
+        #[test]
+        fn system_user_keeps_vue_field_names() {
+            let user = UserResp {
+                id: 1,
+                username: "admin".to_owned(),
+                nickname: "系统管理员".to_owned(),
+                avatar: String::new(),
+                gender: 1,
+                email: String::new(),
+                phone: String::new(),
+                description: "系统初始用户".to_owned(),
+                status: 1,
+                is_system: true,
+                create_user_string: "admin".to_owned(),
+                create_time: "2026-05-29 10:00:00".to_owned(),
+                update_user_string: String::new(),
+                update_time: String::new(),
+                dept_id: 1,
+                dept_name: "总部".to_owned(),
+                role_ids: vec![1],
+                role_names: vec!["系统管理员".to_owned()],
+                disabled: true,
+            };
+
+            let detail = UserDetailResp {
+                user,
+                pwd_reset_time: "2026-05-29 10:00:00".to_owned(),
+            };
+            let value = serde_json::to_value(detail).unwrap();
+
+            assert_eq!(value["id"], 1);
+            assert_eq!(value["username"], "admin");
+            assert_eq!(value["isSystem"], true);
+            assert_eq!(value["createUserString"], "admin");
+            assert_eq!(value["deptId"], 1);
+            assert_eq!(value["deptName"], "总部");
+            assert_eq!(value["roleIds"], json!([1]));
+            assert_eq!(value["roleNames"], json!(["系统管理员"]));
+            assert_eq!(value["pwdResetTime"], "2026-05-29 10:00:00");
+            assert_eq!(value["disabled"], true);
+        }
+
+        #[test]
+        fn system_user_import_and_avatar_responses_keep_vue_field_names() {
+            let import = UserImportResp {
+                import_key: "import-key".to_owned(),
+                total_rows: 3,
+                valid_rows: 2,
+                duplicate_user_rows: 1,
+                duplicate_email_rows: 0,
+                duplicate_phone_rows: 0,
+            };
+            let value = serde_json::to_value(import).unwrap();
+
+            assert_eq!(value["importKey"], "import-key");
+            assert_eq!(value["totalRows"], 3);
+            assert_eq!(value["validRows"], 2);
+            assert_eq!(value["duplicateUserRows"], 1);
+            assert_eq!(value["duplicateEmailRows"], 0);
+            assert_eq!(value["duplicatePhoneRows"], 0);
+
+            let avatar = serde_json::to_value(AvatarResp {
+                avatar: "/file/avatar/avatar.png".to_owned(),
+            })
+            .unwrap();
+            assert_eq!(avatar["avatar"], "/file/avatar/avatar.png");
+        }
+    }
+
     pub mod common {
         use super::*;
 
@@ -248,6 +322,10 @@ async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth
         "/system/role/1/user",
         "/system/role/1",
         "/system/role/1/user/id",
+        "/system/user",
+        "/system/user/list",
+        "/system/user/1",
+        "/user/profile/social",
     ] {
         let response = app
             .clone()

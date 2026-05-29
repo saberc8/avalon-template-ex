@@ -1,6 +1,7 @@
 pub mod dept_service;
 pub mod menu_service;
 pub mod role_service;
+pub mod user_service;
 
 use chrono::NaiveDateTime;
 
