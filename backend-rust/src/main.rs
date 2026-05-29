@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("postgres pool configured");
     // Database migrations are added in the next backend task.
 
-    let app = build_router(db);
+    let app = build_router(db, &config.cors_allowed_origins)?;
     let addr = SocketAddr::from(([0, 0, 0, 0], config.http_port));
     let listener = TcpListener::bind(addr).await?;
 

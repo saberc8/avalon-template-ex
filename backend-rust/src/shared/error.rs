@@ -3,6 +3,8 @@ use thiserror::Error;
 
 use crate::shared::response::ApiResponse;
 
+const INTERNAL_ERROR_MESSAGE: &str = "系统异常，请稍后重试";
+
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("没有访问权限，请联系管理员授权")]
@@ -19,7 +21,7 @@ impl AppError {
     fn code(&self) -> &'static str {
         match self {
             Self::Forbidden => "403",
-            Self::NotFound => "404",
+            Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => "404",
             Self::Sqlx(_) | Self::Anyhow(_) => "500",
         }
     }
@@ -27,16 +29,85 @@ impl AppError {
     fn status(&self) -> StatusCode {
         match self {
             Self::Forbidden => StatusCode::FORBIDDEN,
-            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => StatusCode::NOT_FOUND,
             Self::Sqlx(_) | Self::Anyhow(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+
+    fn client_message(&self) -> &'static str {
+        match self {
+            Self::Forbidden => "没有访问权限，请联系管理员授权",
+            Self::NotFound | Self::Sqlx(sqlx::Error::RowNotFound) => "请求的资源不存在",
+            Self::Sqlx(_) | Self::Anyhow(_) => INTERNAL_ERROR_MESSAGE,
+        }
+    }
+
+    fn should_log_internal(&self) -> bool {
+        matches!(self, Self::Sqlx(_) | Self::Anyhow(_))
+            && !matches!(self, Self::Sqlx(sqlx::Error::RowNotFound))
     }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         let status = self.status();
-        let body = Json(ApiResponse::fail(self.code(), self.to_string()));
+        let code = self.code();
+        let message = self.client_message();
+
+        if self.should_log_internal() {
+            tracing::error!(error = ?self, "internal server error");
+        }
+
+        let body = Json(ApiResponse::fail(code, message));
         (status, body).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::StatusCode;
+    use http_body_util::BodyExt;
+
+    use super::*;
+
+    async fn response_body(error: AppError) -> (StatusCode, ApiResponse<()>) {
+        let response = error.into_response();
+        let status = response.status();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = serde_json::from_slice::<ApiResponse<()>>(&body).unwrap();
+        (status, body)
+    }
+
+    #[tokio::test]
+    async fn sql_internal_error_message_is_not_returned_to_client() {
+        let (status, body) = response_body(AppError::Sqlx(sqlx::Error::Protocol(
+            "secret sql detail".into(),
+        )))
+        .await;
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "500");
+        assert_ne!(body.msg, "secret sql detail");
+        assert!(!body.msg.contains("secret sql detail"));
+    }
+
+    #[tokio::test]
+    async fn anyhow_internal_error_message_is_not_returned_to_client() {
+        let (status, body) =
+            response_body(AppError::Anyhow(anyhow::anyhow!("secret anyhow detail"))).await;
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "500");
+        assert_ne!(body.msg, "secret anyhow detail");
+        assert!(!body.msg.contains("secret anyhow detail"));
+    }
+
+    #[tokio::test]
+    async fn row_not_found_maps_to_not_found_response() {
+        let (status, body) = response_body(AppError::Sqlx(sqlx::Error::RowNotFound)).await;
+
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "404");
+        assert_eq!(body.msg, "请求的资源不存在");
     }
 }
