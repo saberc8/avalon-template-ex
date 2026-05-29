@@ -187,10 +187,18 @@ export default function DictPage() {
         </div>
         <div className="grid gap-2">
           {dicts.map((dict) => (
-            <button
+            <div
               key={dict.id}
-              className={`rounded-md border p-3 text-left text-sm ${selectedDict?.id === dict.id ? "border-primary bg-primary/5" : "bg-background"}`}
+              role="button"
+              tabIndex={0}
+              className={`rounded-md border p-3 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${selectedDict?.id === dict.id ? "border-primary bg-primary/5" : "bg-background"}`}
               onClick={() => setSelectedDict(dict)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedDict(dict);
+                }
+              }}
             >
               <div className="font-medium">{dict.name}</div>
               <div className="text-xs text-muted-foreground">{dict.code}</div>
@@ -206,7 +214,7 @@ export default function DictPage() {
                   </Button>
                 </PermissionGate>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </section>

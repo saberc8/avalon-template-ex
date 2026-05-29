@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { appearanceAttributes, DEFAULT_APPEARANCE } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,10 +15,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning {...appearanceAttributes(DEFAULT_APPEARANCE)}>
       <body>
-        {children}
-        <Toaster />
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { HeaderBar } from "@/components/layout/header-bar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -36,12 +37,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
-      <AppSidebar className="sticky top-0 hidden h-screen w-64 shrink-0 md:flex" routes={routes} />
-      <div className="flex min-w-0 flex-1 flex-col">
+    <SidebarProvider>
+      <AppSidebar routes={routes} />
+      <SidebarInset>
         <HeaderBar />
-        <main className="min-w-0 flex-1 p-3 md:p-4">{children}</main>
-      </div>
-    </div>
+        <main className="min-w-0 flex-1 bg-muted/30 p-[var(--content-padding)]">
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -3,7 +3,7 @@
 import {
   AppWindow,
   Bookmark,
-  Circle,
+  ChevronRight,
   File,
   HardDrive,
   History,
@@ -23,7 +23,37 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, SVGProps } from "react";
-import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  useSidebar
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { firstAccessiblePath, routeHref, routeIsActive, visibleMenuRoutes } from "@/lib/menu";
 import type { RouteItem } from "@/types/auth";
 
@@ -49,110 +79,162 @@ const ICONS: Record<string, IconComponent> = {
 
 interface AppSidebarProps {
   routes: RouteItem[];
-  className?: string;
-  onNavigate?: () => void;
 }
 
-export function AppSidebar({ routes, className, onNavigate }: AppSidebarProps) {
+export function AppSidebar({ routes }: AppSidebarProps) {
+  return (
+    <Sidebar collapsible="icon" variant="inset">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/dashboard/workplace">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <LayoutDashboard className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">Avalon Admin</span>
+                  <span className="truncate text-xs">Management Console</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>导航</SidebarGroupLabel>
+          <SidebarMenu>
+            {visibleMenuRoutes(routes).map((route) => (
+              <SidebarRoute key={route.id} route={route} />
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarUserMenu />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+function SidebarRoute({ route }: { route: RouteItem }) {
   const pathname = usePathname();
-
-  return (
-    <aside className={cn("flex h-full min-h-0 flex-col border-r bg-background", className)}>
-      <Link
-        className="flex h-14 shrink-0 items-center gap-2 border-b px-4 font-semibold"
-        href="/dashboard/workplace"
-        onClick={onNavigate}
-      >
-        <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <LayoutDashboard className="size-4" />
-        </span>
-        <span>Avalon Admin</span>
-      </Link>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <SidebarTree routes={visibleMenuRoutes(routes)} pathname={pathname} onNavigate={onNavigate} />
-      </nav>
-    </aside>
-  );
-}
-
-function SidebarTree({
-  routes,
-  pathname,
-  onNavigate,
-  depth = 0
-}: {
-  routes: RouteItem[];
-  pathname: string;
-  onNavigate?: () => void;
-  depth?: number;
-}) {
-  return (
-    <div className={cn("space-y-1", depth > 0 && "mt-1")}>
-      {routes.map((route) => (
-        <SidebarItem
-          key={route.id}
-          route={route}
-          pathname={pathname}
-          depth={depth}
-          onNavigate={onNavigate}
-        />
-      ))}
-    </div>
-  );
-}
-
-function SidebarItem({
-  route,
-  pathname,
-  depth,
-  onNavigate
-}: {
-  route: RouteItem;
-  pathname: string;
-  depth: number;
-  onNavigate?: () => void;
-}) {
+  const { setOpenMobile } = useSidebar();
   const children = visibleMenuRoutes(route.children);
-  const href = route.redirect || (children.length > 0 ? firstAccessiblePath(children) : routeHref(route));
   const active = routeIsActive(route, pathname) || children.some((child) => routeIsActive(child, pathname));
+  const href = route.redirect || (children.length > 0 ? firstAccessiblePath(children) : routeHref(route));
   const Icon = iconFor(route.icon);
-  const indent = depth > 0 ? "pl-8" : "";
+
+  if (children.length === 0) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild tooltip={route.title} isActive={active}>
+          <Link href={href || "#"} onClick={() => setOpenMobile(false)}>
+            <Icon className="app-icon" />
+            <span>{route.title}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
 
   return (
-    <div>
-      {href ? (
-        <Link
-          className={cn(
-            "flex h-9 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-            indent,
-            active && "bg-primary/10 font-medium text-primary"
-          )}
-          href={href}
-          onClick={onNavigate}
-        >
-          <Icon className="size-4 shrink-0" />
-          <span className="truncate">{route.title}</span>
+    <Collapsible asChild defaultOpen={active}>
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild tooltip={route.title} isActive={active}>
+          <Link href={href || "#"} onClick={() => setOpenMobile(false)}>
+            <Icon className="app-icon" />
+            <span>{route.title}</span>
+          </Link>
+        </SidebarMenuButton>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuAction className="data-[state=open]:rotate-90">
+            <ChevronRight className="size-4" />
+            <span className="sr-only">展开 {route.title}</span>
+          </SidebarMenuAction>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {children.map((child) => (
+              <SidebarSubRoute key={child.id} route={child} pathname={pathname} />
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
+function SidebarSubRoute({ route, pathname }: { route: RouteItem; pathname: string }) {
+  const { setOpenMobile } = useSidebar();
+  const active = routeIsActive(route, pathname);
+  const href = route.redirect || routeHref(route);
+
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild isActive={active}>
+        <Link href={href || "#"} onClick={() => setOpenMobile(false)}>
+          <span>{route.title}</span>
         </Link>
-      ) : (
-        <div
-          className={cn(
-            "flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground",
-            indent
-          )}
-        >
-          <Icon className="size-4 shrink-0" />
-          <span className="truncate">{route.title}</span>
-        </div>
-      )}
-      {children.length > 0 ? (
-        <div className="ml-2 border-l pl-2">
-          <SidebarTree routes={children} pathname={pathname} depth={depth + 1} onNavigate={onNavigate} />
-        </div>
-      ) : null}
-    </div>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  );
+}
+
+function SidebarUserMenu() {
+  const { user, logout } = useCurrentUser();
+  const { isMobile } = useSidebar();
+  const displayName = user?.nickname || user?.username || "用户";
+  const fallback = displayName.slice(0, 1).toUpperCase();
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <Avatar className="size-8 rounded-lg">
+                {user?.avatar ? <AvatarImage src={user.avatar} alt={displayName} /> : null}
+                <AvatarFallback className="rounded-lg text-xs">{fallback}</AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{displayName}</span>
+                <span className="truncate text-xs text-sidebar-foreground/70">{user?.deptName || "-"}</span>
+              </div>
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            side={isMobile ? "bottom" : "right"}
+            sideOffset={4}
+            className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
+          >
+            <DropdownMenuLabel>
+              <div className="truncate">{displayName}</div>
+              <div className="truncate text-xs font-normal text-muted-foreground">{user?.username || "-"}</div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/user/profile">
+                <User className="size-4" />
+                个人中心
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void logout()}>
+              <Lock className="size-4" />
+              退出登录
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
 function iconFor(icon: string): IconComponent {
-  return ICONS[icon] ?? AppWindow ?? Circle;
+  return ICONS[icon] ?? AppWindow;
 }
