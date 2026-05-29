@@ -30,9 +30,22 @@ const STYLE_LABELS: Record<AppearanceSettings["style"], string> = {
 };
 
 const PRIMARY_LABELS: Record<AppearanceSettings["primary"], string> = {
+  black: "黑色",
+  red: "红色",
+  orange: "橙色",
+  yellow: "黄色",
+  lime: "青柠",
+  green: "绿色",
+  teal: "蓝绿",
+  cyan: "青色",
+  sky: "天蓝",
   blue: "蓝色",
-  emerald: "绿色",
-  violet: "紫色",
+  indigo: "靛蓝",
+  emerald: "翠绿",
+  violet: "紫罗兰",
+  purple: "深紫",
+  fuchsia: "洋红",
+  pink: "粉色",
   amber: "琥珀",
   rose: "玫红"
 };
@@ -59,9 +72,22 @@ const RADIUS_LABELS: Record<AppearanceSettings["radius"], string> = {
 };
 
 const PRIMARY_SWATCHES: Record<AppearanceSettings["primary"], string> = {
+  black: "bg-zinc-950",
+  red: "bg-red-500",
+  orange: "bg-orange-500",
+  yellow: "bg-yellow-500",
+  lime: "bg-lime-500",
+  green: "bg-green-500",
+  teal: "bg-teal-500",
+  cyan: "bg-cyan-500",
+  sky: "bg-sky-500",
   blue: "bg-blue-500",
+  indigo: "bg-indigo-500",
   emerald: "bg-emerald-500",
   violet: "bg-violet-500",
+  purple: "bg-purple-500",
+  fuchsia: "bg-fuchsia-500",
+  pink: "bg-pink-500",
   amber: "bg-amber-500",
   rose: "bg-rose-500"
 };

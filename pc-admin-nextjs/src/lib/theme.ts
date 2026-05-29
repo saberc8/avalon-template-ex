@@ -1,7 +1,26 @@
 export const APPEARANCE_STORAGE_KEY = "avalon-admin-appearance";
 
 export const APPEARANCE_STYLES = ["default", "compact", "spacious"] as const;
-export const PRIMARY_COLORS = ["blue", "emerald", "violet", "amber", "rose"] as const;
+export const PRIMARY_COLORS = [
+  "black",
+  "red",
+  "orange",
+  "amber",
+  "yellow",
+  "lime",
+  "green",
+  "emerald",
+  "teal",
+  "cyan",
+  "sky",
+  "blue",
+  "indigo",
+  "violet",
+  "purple",
+  "fuchsia",
+  "pink",
+  "rose"
+] as const;
 export const NEUTRAL_COLORS = ["neutral", "slate", "zinc", "stone"] as const;
 export const ICON_COLORS = ["inherit", "primary", "accent", "muted"] as const;
 export const RADIUS_OPTIONS = ["none", "sm", "md", "lg"] as const;
@@ -22,8 +41,8 @@ export interface AppearanceSettings {
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   style: "default",
-  primary: "blue",
-  neutral: "neutral",
+  primary: "black",
+  neutral: "zinc",
   iconColor: "inherit",
   radius: "md"
 };

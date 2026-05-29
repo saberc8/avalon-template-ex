@@ -14,8 +14,8 @@ describe("appearance settings", () => {
   it("parses persisted valid settings", () => {
     const settings: AppearanceSettings = {
       style: "compact",
-      primary: "emerald",
-      neutral: "slate",
+      primary: "cyan",
+      neutral: "neutral",
       iconColor: "accent",
       radius: "lg"
     };
