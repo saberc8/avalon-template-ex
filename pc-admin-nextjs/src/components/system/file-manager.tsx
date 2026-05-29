@@ -163,7 +163,7 @@ export function FileManager() {
   }
 
   function openFile(file: FileItem) {
-    if (file.type === 2) {
+    if (file.type === 0) {
       setParentPath(file.path);
       setPage(1);
       return;
