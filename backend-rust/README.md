@@ -1,5 +1,9 @@
 # Rust Admin Backend
 
+## Default Account
+
+The seed migrations create `admin/admin123` for local development. Change this password outside local development before exposing the service.
+
 ## Migration Smoke Checklist
 
 Run migrations against a local PostgreSQL database:

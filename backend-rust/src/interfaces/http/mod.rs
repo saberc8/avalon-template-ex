@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use axum::{
+    extract::State,
     http::{header, HeaderValue, Method},
+    response::IntoResponse,
     routing::get,
     Json, Router,
 };
@@ -10,7 +12,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use crate::shared::response::ApiResponse;
+use crate::shared::{error::AppError, response::ApiResponse};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -22,6 +24,7 @@ pub fn build_router(db: PgPool, cors_allowed_origins: &[String]) -> Result<Route
 
     Ok(Router::new()
         .route("/health", get(health))
+        .route("/ready", get(ready))
         .with_state(AppState { db })
         .layer(cors)
         .layer(TraceLayer::new_for_http()))
@@ -58,8 +61,18 @@ async fn health() -> Json<ApiResponse<&'static str>> {
     Json(ApiResponse::ok("ok"))
 }
 
+async fn ready(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(ApiResponse::ok("ready")))
+}
+
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
@@ -95,6 +108,33 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = serde_json::from_slice::<Value>(&body).unwrap();
         assert_eq!(body, json!({"code": "200", "msg": "成功", "data": "ok"}));
+    }
+
+    #[tokio::test]
+    async fn ready_route_returns_generic_error_when_database_is_unreachable() {
+        let db = PgPoolOptions::new()
+            .acquire_timeout(Duration::from_millis(100))
+            .connect_lazy("postgres://postgres:postgres@127.0.0.1:1/avalon_admin")
+            .unwrap();
+        let app = build_router(db, &["http://localhost:3000".to_owned()]).unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = serde_json::from_slice::<Value>(&body).unwrap();
+        assert_eq!(
+            body,
+            json!({"code": "500", "msg": "系统异常，请稍后重试", "data": null})
+        );
     }
 
     #[tokio::test]
