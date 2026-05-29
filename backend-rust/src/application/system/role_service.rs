@@ -8,9 +8,13 @@ use crate::{
     },
     infrastructure::persistence::system_role_repository::{
         RoleCreateRecord, RoleListFilter, RolePermissionRecord, RoleRecord, RoleUpdateRecord,
-        SystemRoleRepository,
+        RoleUserListFilter, RoleUserRecord, SystemRoleRepository,
     },
-    shared::{error::AppError, id::next_id},
+    shared::{
+        error::AppError,
+        id::next_id,
+        pagination::{PageQuery, PageResult},
+    },
 };
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -18,6 +22,21 @@ use crate::{
 pub struct RoleQuery {
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
+    pub sort: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleUserPageQuery {
+    #[serde(default = "default_page")]
+    pub page: u64,
+    #[serde(default = "default_size")]
+    pub size: u64,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub sort: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,6 +93,25 @@ pub struct RoleDetailResp {
     pub dept_ids: Vec<i64>,
     pub menu_check_strictly: bool,
     pub dept_check_strictly: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleUserResp {
+    pub id: i64,
+    pub role_id: i64,
+    pub user_id: i64,
+    pub username: String,
+    pub nickname: String,
+    pub gender: i16,
+    pub status: i16,
+    pub is_system: bool,
+    pub description: String,
+    pub dept_id: i64,
+    pub dept_name: String,
+    pub role_ids: Vec<i64>,
+    pub role_names: Vec<String>,
+    pub disabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -214,6 +252,59 @@ impl RoleService {
         }
         self.roles.user_ids(id).await
     }
+
+    pub async fn user_page(
+        &self,
+        role_id: i64,
+        query: RoleUserPageQuery,
+    ) -> Result<PageResult<RoleUserResp>, AppError> {
+        ensure_positive_role_id(role_id)?;
+        let page = PageQuery {
+            page: query.page,
+            size: query.size,
+        }
+        .normalized();
+        let description = query
+            .description
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let filter = RoleUserListFilter {
+            role_id,
+            description,
+            limit: page.limit(),
+            offset: page.offset(),
+        };
+        let total = self.roles.count_role_users(&filter).await?;
+        let list = self
+            .roles
+            .list_role_users(&filter)
+            .await?
+            .into_iter()
+            .map(RoleUserResp::from)
+            .collect();
+
+        Ok(PageResult::new(list, total))
+    }
+
+    pub async fn assign_users(&self, role_id: i64, user_ids: Vec<i64>) -> Result<(), AppError> {
+        ensure_positive_role_id(role_id)?;
+        let user_ids = normalize_ids(user_ids);
+        if user_ids.is_empty() {
+            return Err(AppError::bad_request("用户ID列表不能为空"));
+        }
+
+        self.roles.assign_users(role_id, &user_ids).await
+    }
+
+    pub async fn unassign_user_roles(&self, user_role_ids: Vec<i64>) -> Result<(), AppError> {
+        let user_role_ids = normalize_ids(user_role_ids);
+        if user_role_ids.is_empty() {
+            return Err(AppError::bad_request("用户角色ID列表不能为空"));
+        }
+
+        self.roles.unassign_user_roles(&user_role_ids).await
+    }
 }
 
 impl From<RoleRecord> for RoleResp {
@@ -234,6 +325,35 @@ impl From<RoleRecord> for RoleResp {
             disabled,
         }
     }
+}
+
+impl From<RoleUserRecord> for RoleUserResp {
+    fn from(record: RoleUserRecord) -> Self {
+        let disabled = record.is_system && record.role_id == 1;
+        Self {
+            id: record.id,
+            role_id: record.role_id,
+            user_id: record.user_id,
+            username: record.username,
+            nickname: record.nickname,
+            gender: record.gender,
+            status: record.status,
+            is_system: record.is_system,
+            description: record.description,
+            dept_id: record.dept_id,
+            dept_name: record.dept_name,
+            role_ids: record.role_ids,
+            role_names: record.role_names,
+            disabled,
+        }
+    }
+}
+
+fn ensure_positive_role_id(role_id: i64) -> Result<(), AppError> {
+    if role_id <= 0 {
+        return Err(AppError::bad_request("ID 参数不正确"));
+    }
+    Ok(())
 }
 
 fn normalize_role_command(mut command: RoleCommand) -> Result<RoleCommand, AppError> {
@@ -303,6 +423,14 @@ fn default_true() -> bool {
     true
 }
 
+fn default_page() -> u64 {
+    crate::shared::pagination::DEFAULT_PAGE
+}
+
+fn default_size() -> u64 {
+    crate::shared::pagination::DEFAULT_PAGE_SIZE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,5 +451,26 @@ mod tests {
             normalize_role_command(command),
             Err(AppError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn role_user_resp_disables_admin_system_user_association() {
+        let resp = RoleUserResp::from(RoleUserRecord {
+            id: 10,
+            role_id: 1,
+            user_id: 1,
+            username: "admin".to_owned(),
+            nickname: "系统管理员".to_owned(),
+            gender: 1,
+            status: 1,
+            is_system: true,
+            description: String::new(),
+            dept_id: 1,
+            dept_name: "总部".to_owned(),
+            role_ids: vec![1],
+            role_names: vec!["系统管理员".to_owned()],
+        });
+
+        assert!(resp.disabled);
     }
 }

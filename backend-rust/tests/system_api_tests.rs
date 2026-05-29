@@ -8,7 +8,7 @@ use backend_rust::{
     application::system::{
         dept_service::{build_dept_tree, DeptResp},
         menu_service::{build_menu_tree, MenuResp},
-        role_service::{RoleDetailResp, RoleResp},
+        role_service::{RoleDetailResp, RoleResp, RoleUserResp},
     },
     infrastructure::security::jwt::JwtService,
     interfaces::http::{build_router, common::CommonTreeNode},
@@ -155,6 +155,38 @@ mod system {
             assert_eq!(value["menuCheckStrictly"], true);
             assert_eq!(value["deptCheckStrictly"], true);
         }
+
+        #[test]
+        fn system_role_user_keeps_vue_and_go_field_names() {
+            let user = RoleUserResp {
+                id: 100,
+                role_id: 1,
+                user_id: 1,
+                username: "admin".to_owned(),
+                nickname: "系统管理员".to_owned(),
+                gender: 1,
+                status: 1,
+                is_system: true,
+                description: "系统初始用户".to_owned(),
+                dept_id: 1,
+                dept_name: "总部".to_owned(),
+                role_ids: vec![1, 2],
+                role_names: vec!["系统管理员".to_owned(), "普通用户".to_owned()],
+                disabled: true,
+            };
+
+            let value = serde_json::to_value(user).unwrap();
+            assert_eq!(value["id"], 100);
+            assert_eq!(value["roleId"], 1);
+            assert_eq!(value["userId"], 1);
+            assert_eq!(value["username"], "admin");
+            assert_eq!(value["nickname"], "系统管理员");
+            assert_eq!(value["deptId"], 1);
+            assert_eq!(value["deptName"], "总部");
+            assert_eq!(value["roleIds"], json!([1, 2]));
+            assert_eq!(value["roleNames"], json!(["系统管理员", "普通用户"]));
+            assert_eq!(value["disabled"], true);
+        }
     }
 
     pub mod common {
@@ -213,6 +245,7 @@ async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth
         "/system/menu/tree",
         "/system/menu/1",
         "/system/role/list",
+        "/system/role/1/user",
         "/system/role/1",
         "/system/role/1/user/id",
     ] {
@@ -229,6 +262,33 @@ async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth
         assert_eq!(body["msg"], "未授权，请重新登录", "{uri}");
         assert_eq!(body["data"], Value::Null, "{uri}");
         assert_eq!(body["success"], false, "{uri}");
+        assert_epoch_millis_timestamp(&body, uri);
+    }
+
+    for (method, uri) in [
+        ("POST", "/system/role/1/user"),
+        ("DELETE", "/system/role/user"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(uri)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("[]"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK, "{method} {uri}");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = serde_json::from_slice::<Value>(&body).unwrap();
+        assert_eq!(body["code"], "401", "{method} {uri}");
+        assert_eq!(body["msg"], "未授权，请重新登录", "{method} {uri}");
+        assert_eq!(body["data"], Value::Null, "{method} {uri}");
+        assert_eq!(body["success"], false, "{method} {uri}");
         assert_epoch_millis_timestamp(&body, uri);
     }
 }
@@ -309,6 +369,156 @@ async fn real_system_role_list_success_path_uses_vue_envelope() {
     assert!(first.get("dataScope").is_some());
 }
 
+#[tokio::test]
+#[ignore = "requires migrated PostgreSQL seed data; run with DATABASE_URL pointing at a local test database"]
+async fn real_system_role_user_list_success_path_uses_vue_page_envelope() {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/avalon_admin".to_owned());
+    let db = PgPoolOptions::new()
+        .connect(&database_url)
+        .await
+        .expect("connect to seeded PostgreSQL test database");
+    let jwt = test_jwt();
+    let token = jwt.issue(1, "admin").expect("issue test JWT");
+    let app = build_router(db, &["http://localhost:3000".to_owned()], jwt).unwrap();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/system/role/1/user?page=1&size=10")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body = serde_json::from_slice::<Value>(&body).unwrap();
+    assert_eq!(body["code"], "200");
+    assert_eq!(body["success"], true);
+    assert_epoch_millis_timestamp(&body, "/system/role/1/user");
+    assert!(body["data"]["total"].as_i64().unwrap_or_default() >= 1);
+
+    let first = &body["data"]["list"][0];
+    for key in [
+        "id",
+        "roleId",
+        "userId",
+        "username",
+        "nickname",
+        "gender",
+        "status",
+        "isSystem",
+        "description",
+        "deptId",
+        "deptName",
+        "roleIds",
+        "roleNames",
+        "disabled",
+    ] {
+        assert!(first.get(key).is_some(), "missing {key}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires migrated PostgreSQL seed data; run with DATABASE_URL pointing at a local test database"]
+async fn real_system_role_user_assign_and_unassign_accept_raw_id_arrays() {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/avalon_admin".to_owned());
+    let db = PgPoolOptions::new()
+        .connect(&database_url)
+        .await
+        .expect("connect to seeded PostgreSQL test database");
+    let test_user_id = 9_000_000_001_i64;
+    cleanup_role_user_test_data(&db, test_user_id).await;
+    sqlx::query(
+        r#"
+INSERT INTO sys_user (
+    id, username, nickname, gender, status, is_system, description,
+    dept_id, create_user, create_time
+)
+VALUES ($1, 'rust_role_assign_test', 'Rust角色分配测试', 0, 1, FALSE, 'role assign test',
+        1, 1, NOW());
+"#,
+    )
+    .bind(test_user_id)
+    .execute(&db)
+    .await
+    .expect("insert temporary role assignment user");
+
+    let jwt = test_jwt();
+    let token = jwt.issue(1, "admin").expect("issue test JWT");
+    let app = build_router(db.clone(), &["http://localhost:3000".to_owned()], jwt).unwrap();
+
+    let assign = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/system/role/2/user")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("[{test_user_id}]")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_success_bool(assign).await;
+
+    let list = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/system/role/2/user?description=rust_role_assign_test")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = response_json(list).await;
+    assert_eq!(body["code"], "200");
+    assert_eq!(body["success"], true);
+    let user_role_id = body["data"]["list"][0]["id"]
+        .as_i64()
+        .expect("sys_user_role.id should be returned as id");
+    assert_eq!(body["data"]["list"][0]["roleId"], 2);
+    assert_eq!(body["data"]["list"][0]["userId"], test_user_id);
+
+    let unassign = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/system/role/user")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("[{user_role_id}]")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_success_bool(unassign).await;
+
+    let list_after_unassign = app
+        .oneshot(
+            Request::builder()
+                .uri("/system/role/2/user?description=rust_role_assign_test")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = response_json(list_after_unassign).await;
+    assert_eq!(body["code"], "200");
+    assert_eq!(body["data"]["total"], 0);
+
+    cleanup_role_user_test_data(&db, test_user_id).await;
+}
+
 fn dept_with_status(id: i64, parent_id: i64, name: &str, status: i16) -> DeptResp {
     DeptResp {
         status,
@@ -321,6 +531,32 @@ fn assert_epoch_millis_timestamp(body: &Value, context: &str) {
         .as_str()
         .unwrap_or_else(|| panic!("{context} timestamp must be a string"));
     assert!(timestamp.parse::<i64>().is_ok(), "{context} timestamp");
+}
+
+async fn response_json(response: axum::response::Response) -> Value {
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice::<Value>(&body).unwrap()
+}
+
+async fn assert_success_bool(response: axum::response::Response) {
+    let body = response_json(response).await;
+    assert_eq!(body["code"], "200");
+    assert_eq!(body["success"], true);
+    assert_eq!(body["data"], true);
+}
+
+async fn cleanup_role_user_test_data(db: &sqlx::PgPool, test_user_id: i64) {
+    sqlx::query("DELETE FROM sys_user_role WHERE user_id = $1;")
+        .bind(test_user_id)
+        .execute(db)
+        .await
+        .expect("cleanup temporary role assignment relations");
+    sqlx::query("DELETE FROM sys_user WHERE id = $1;")
+        .bind(test_user_id)
+        .execute(db)
+        .await
+        .expect("cleanup temporary role assignment user");
 }
 
 async fn fixture_common_dept_tree() -> Json<ApiResponse<Vec<CommonTreeNode>>> {

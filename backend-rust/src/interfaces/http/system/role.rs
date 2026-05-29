@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use serde::Serialize;
@@ -8,10 +8,11 @@ use serde::Serialize;
 use crate::{
     application::system::role_service::{
         RoleCommand, RoleDetailResp, RolePermissionCommand, RoleQuery, RoleResp, RoleService,
+        RoleUserPageQuery, RoleUserResp,
     },
     domain::auth::model::CurrentUser,
     interfaces::http::middleware::permission::require_permission,
-    shared::{error::AppError, response::ApiResponse},
+    shared::{error::AppError, pagination::PageResult, response::ApiResponse},
 };
 
 use super::{super::AppState, IdsReq};
@@ -21,6 +22,8 @@ pub fn routes() -> Router<AppState> {
         .route("/system/role/list", get(list))
         .route("/system/role/:id/permission", put(update_permission))
         .route("/system/role/:id/user/id", get(list_user_ids))
+        .route("/system/role/:id/user", get(list_users).post(assign_users))
+        .route("/system/role/user", delete(unassign_users))
         .route("/system/role/:id", get(get_detail).put(update))
         .route("/system/role", post(create).delete(delete_many))
 }
@@ -114,4 +117,41 @@ async fn list_user_ids(
     let service = RoleService::new(state.db);
 
     Ok(Json(ApiResponse::ok(service.user_ids(id).await?)))
+}
+
+async fn list_users(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+    Path(id): Path<i64>,
+    Query(query): Query<RoleUserPageQuery>,
+) -> Result<Json<ApiResponse<PageResult<RoleUserResp>>>, AppError> {
+    require_permission(&current_user, "system:role:assign")?;
+    let service = RoleService::new(state.db);
+
+    Ok(Json(ApiResponse::ok(service.user_page(id, query).await?)))
+}
+
+async fn assign_users(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+    Path(id): Path<i64>,
+    Json(user_ids): Json<Vec<i64>>,
+) -> Result<Json<ApiResponse<bool>>, AppError> {
+    require_permission(&current_user, "system:role:assign")?;
+    let service = RoleService::new(state.db);
+    service.assign_users(id, user_ids).await?;
+
+    Ok(Json(ApiResponse::ok(true)))
+}
+
+async fn unassign_users(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+    Json(user_role_ids): Json<Vec<i64>>,
+) -> Result<Json<ApiResponse<bool>>, AppError> {
+    require_permission(&current_user, "system:role:unassign")?;
+    let service = RoleService::new(state.db);
+    service.unassign_user_roles(user_role_ids).await?;
+
+    Ok(Json(ApiResponse::ok(true)))
 }

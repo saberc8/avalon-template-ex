@@ -25,9 +25,34 @@ pub struct RoleRecord {
     pub update_user_string: String,
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct RoleUserRecord {
+    pub id: i64,
+    pub role_id: i64,
+    pub user_id: i64,
+    pub username: String,
+    pub nickname: String,
+    pub gender: i16,
+    pub status: i16,
+    pub is_system: bool,
+    pub description: String,
+    pub dept_id: i64,
+    pub dept_name: String,
+    pub role_ids: Vec<i64>,
+    pub role_names: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct RoleListFilter<'a> {
     pub description: Option<&'a str>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RoleUserListFilter<'a> {
+    pub role_id: i64,
+    pub description: Option<&'a str>,
+    pub limit: i64,
+    pub offset: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -306,6 +331,96 @@ LIMIT 1;
         .await?)
     }
 
+    pub async fn count_role_users(&self, filter: &RoleUserListFilter<'_>) -> Result<i64, AppError> {
+        let mut query = QueryBuilder::<Postgres>::new(
+            r#"
+SELECT COUNT(*)
+FROM sys_user_role AS ur
+JOIN sys_user AS u ON u.id = ur.user_id
+WHERE ur.role_id = "#,
+        );
+        query.push_bind(filter.role_id);
+        push_role_user_description_filter(&mut query, filter.description);
+
+        Ok(query
+            .build_query_scalar::<i64>()
+            .fetch_one(&self.db)
+            .await?)
+    }
+
+    pub async fn list_role_users(
+        &self,
+        filter: &RoleUserListFilter<'_>,
+    ) -> Result<Vec<RoleUserRecord>, AppError> {
+        let mut query = QueryBuilder::<Postgres>::new(role_user_select_sql());
+        query.push(" WHERE ur.role_id = ").push_bind(filter.role_id);
+        push_role_user_description_filter(&mut query, filter.description);
+        query.push(
+            r#"
+GROUP BY
+    ur.id,
+    ur.role_id,
+    u.id,
+    u.username,
+    u.nickname,
+    u.gender,
+    u.status,
+    u.is_system,
+    u.description,
+    u.dept_id,
+    d.name
+ORDER BY ur.id DESC
+LIMIT "#,
+        );
+        query
+            .push_bind(filter.limit)
+            .push(" OFFSET ")
+            .push_bind(filter.offset);
+
+        Ok(query
+            .build_query_as::<RoleUserRecord>()
+            .fetch_all(&self.db)
+            .await?)
+    }
+
+    pub async fn assign_users(&self, role_id: i64, user_ids: &[i64]) -> Result<(), AppError> {
+        if user_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.db.begin().await?;
+        for user_id in normalized_ids(user_ids) {
+            sqlx::query(
+                r#"
+INSERT INTO sys_user_role (id, user_id, role_id)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, role_id) DO NOTHING;
+"#,
+            )
+            .bind(crate::shared::id::next_id())
+            .bind(user_id)
+            .bind(role_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn unassign_user_roles(&self, user_role_ids: &[i64]) -> Result<(), AppError> {
+        if user_role_ids.is_empty() {
+            return Ok(());
+        }
+
+        sqlx::query("DELETE FROM sys_user_role WHERE id = ANY($1);")
+            .bind(normalized_ids(user_role_ids))
+            .execute(&self.db)
+            .await?;
+
+        Ok(())
+    }
+
     async fn exists_by_unique_column(
         &self,
         column: &'static str,
@@ -325,6 +440,38 @@ LIMIT 1;
             .fetch_one(&self.db)
             .await?)
     }
+}
+
+fn role_user_select_sql() -> &'static str {
+    r#"
+SELECT
+    ur.id,
+    ur.role_id,
+    u.id AS user_id,
+    u.username,
+    u.nickname,
+    u.gender,
+    u.status,
+    u.is_system,
+    COALESCE(u.description, '') AS description,
+    u.dept_id,
+    COALESCE(d.name, '') AS dept_name,
+    COALESCE(
+        ARRAY_AGG(DISTINCT all_ur.role_id ORDER BY all_ur.role_id)
+            FILTER (WHERE all_ur.role_id IS NOT NULL),
+        ARRAY[]::BIGINT[]
+    ) AS role_ids,
+    COALESCE(
+        ARRAY_AGG(DISTINCT r.name ORDER BY r.name)
+            FILTER (WHERE r.name IS NOT NULL),
+        ARRAY[]::TEXT[]
+    ) AS role_names
+FROM sys_user_role AS ur
+JOIN sys_user AS u ON u.id = ur.user_id
+LEFT JOIN sys_dept AS d ON d.id = u.dept_id
+LEFT JOIN sys_user_role AS all_ur ON all_ur.user_id = u.id
+LEFT JOIN sys_role AS r ON r.id = all_ur.role_id
+"#
 }
 
 fn role_select_sql() -> &'static str {
@@ -347,6 +494,23 @@ FROM sys_role AS r
 LEFT JOIN sys_user AS cu ON cu.id = r.create_user
 LEFT JOIN sys_user AS uu ON uu.id = r.update_user
 "#
+}
+
+fn push_role_user_description_filter(
+    query: &mut QueryBuilder<'_, Postgres>,
+    description: Option<&str>,
+) {
+    if let Some(description) = description.map(str::trim).filter(|value| !value.is_empty()) {
+        let pattern = format!("%{description}%");
+        query
+            .push(" AND (u.username ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" OR u.nickname ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" OR COALESCE(u.description, '') ILIKE ")
+            .push_bind(pattern)
+            .push(")");
+    }
 }
 
 async fn insert_role_depts(
