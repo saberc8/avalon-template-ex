@@ -18,9 +18,11 @@ import {
   updateDictItem
 } from "@/api/system/dict";
 import { DataTable } from "@/components/table/data-table";
+import { TableActionButton, TableActions } from "@/components/table/table-actions";
 import { PermissionGate } from "@/components/permission/permission-gate";
 import { DictForm, DictItemForm } from "@/components/system/dict-form";
 import { StatusBadge } from "@/components/system/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,14 +44,30 @@ export default function DictPage() {
   const [itemOpen, setItemOpen] = useState(false);
   const [editingDict, setEditingDict] = useState<DictResp | null>(null);
   const [editingItem, setEditingItem] = useState<DictItemResp | null>(null);
+  const [dictLoading, setDictLoading] = useState(false);
+  const [itemLoading, setItemLoading] = useState(false);
+  const [dictDeleteTarget, setDictDeleteTarget] = useState<DictResp | null>(null);
+  const [itemDeleteTarget, setItemDeleteTarget] = useState<DictItemResp | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const loadDicts = useCallback(async () => {
+    setDictLoading(true);
     try {
       const data = await listDict({ description: keyword || undefined, sort: ["id,desc"] });
       setDicts(data);
-      setSelectedDict((current) => current ?? data[0] ?? null);
+      setSelectedDict((current) => {
+        if (!data.length) {
+          return null;
+        }
+        if (!current) {
+          return data[0];
+        }
+        return data.find((dict) => dict.id === current.id) ?? data[0];
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "字典列表加载失败");
+    } finally {
+      setDictLoading(false);
     }
   }, [keyword]);
 
@@ -58,6 +76,7 @@ export default function DictPage() {
       setItems([]);
       return;
     }
+    setItemLoading(true);
     try {
       const result = await listDictItem({
         page: 1,
@@ -69,6 +88,8 @@ export default function DictPage() {
       setItems(result.list);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "字典项加载失败");
+    } finally {
+      setItemLoading(false);
     }
   }, [itemKeyword, selectedDict]);
 
@@ -84,7 +105,21 @@ export default function DictPage() {
     () => [
       { accessorKey: "label", header: "标签" },
       { accessorKey: "value", header: "值" },
-      { accessorKey: "color", header: "颜色" },
+      {
+        header: "颜色",
+        cell: ({ row }) => {
+          const color = row.original.color;
+          if (!color) {
+            return "-";
+          }
+          return (
+            <span className="inline-flex items-center gap-2">
+              <span className="size-3 rounded-sm border" style={{ backgroundColor: color }} />
+              {color}
+            </span>
+          );
+        }
+      },
       {
         header: "状态",
         cell: ({ row }) => <StatusBadge status={row.original.status} />
@@ -94,18 +129,14 @@ export default function DictPage() {
         id: "actions",
         header: "操作",
         cell: ({ row }) => (
-          <div className="flex flex-wrap gap-1">
+          <TableActions>
             <PermissionGate permissions={["system:dict:item:update"]}>
-              <Button size="icon" variant="ghost" title="编辑" onClick={() => void openItem(row.original.id)}>
-                <Pencil />
-              </Button>
+              <TableActionButton icon={Pencil} label="编辑" onClick={() => void openItem(row.original.id)} />
             </PermissionGate>
             <PermissionGate permissions={["system:dict:item:delete"]}>
-              <Button size="icon" variant="ghost" title="删除" onClick={() => void removeItem(row.original.id)}>
-                <Trash2 />
-              </Button>
+              <TableActionButton icon={Trash2} label="删除" destructive onClick={() => setItemDeleteTarget(row.original)} />
             </PermissionGate>
-          </div>
+          </TableActions>
         )
       }
     ],
@@ -129,12 +160,20 @@ export default function DictPage() {
     }
   }
 
-  async function removeDict(id: number) {
-    if (!window.confirm("确认删除该字典？")) return;
-    await deleteDict(id);
-    setSelectedDict(null);
-    await loadDicts();
-    toast.success("字典已删除");
+  async function confirmRemoveDict() {
+    if (!dictDeleteTarget) return;
+    setDeleteSubmitting(true);
+    try {
+      await deleteDict(dictDeleteTarget.id);
+      setDictDeleteTarget(null);
+      setSelectedDict(null);
+      await loadDicts();
+      toast.success("字典已删除");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "字典删除失败");
+    } finally {
+      setDeleteSubmitting(false);
+    }
   }
 
   async function openItem(id?: number) {
@@ -154,11 +193,19 @@ export default function DictPage() {
     }
   }
 
-  async function removeItem(id: number) {
-    if (!window.confirm("确认删除该字典项？")) return;
-    await deleteDictItem(id);
-    await loadItems();
-    toast.success("字典项已删除");
+  async function confirmRemoveItem() {
+    if (!itemDeleteTarget) return;
+    setDeleteSubmitting(true);
+    try {
+      await deleteDictItem(itemDeleteTarget.id);
+      setItemDeleteTarget(null);
+      await loadItems();
+      toast.success("字典项已删除");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "字典项删除失败");
+    } finally {
+      setDeleteSubmitting(false);
+    }
   }
 
   async function clearCache() {
@@ -168,10 +215,13 @@ export default function DictPage() {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-4 lg:grid-cols-[320px_1fr]">
+    <div className="mx-auto grid w-full max-w-7xl gap-4 lg:grid-cols-[340px_1fr]">
       <section className="rounded-lg border bg-background p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">字典</h2>
+          <div>
+            <h2 className="text-base font-semibold">字典</h2>
+            <p className="text-xs text-muted-foreground">{dicts.length} 个配置分组</p>
+          </div>
           <PermissionGate permissions={["system:dict:create"]}>
             <Button size="sm" onClick={() => void openDict()}>
               <FilePlus2 />
@@ -180,12 +230,21 @@ export default function DictPage() {
           </PermissionGate>
         </div>
         <div className="mb-3 flex gap-2">
-          <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} />
-          <Button variant="outline" size="icon" onClick={() => void loadDicts()}>
+          <Input
+            value={keyword}
+            placeholder="搜索字典名称或描述"
+            onChange={(event) => setKeyword(event.target.value)}
+          />
+          <Button variant="outline" size="sm" onClick={() => void loadDicts()} disabled={dictLoading}>
             <RefreshCw />
+            刷新
           </Button>
         </div>
         <div className="grid gap-2">
+          {dictLoading ? <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">加载中</div> : null}
+          {!dictLoading && !dicts.length ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">暂无字典</div>
+          ) : null}
           {dicts.map((dict) => (
             <div
               key={dict.id}
@@ -200,16 +259,22 @@ export default function DictPage() {
                 }
               }}
             >
-              <div className="font-medium">{dict.name}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium">{dict.name}</div>
+                {dict.isSystem ? <Badge variant="secondary">系统</Badge> : null}
+              </div>
               <div className="text-xs text-muted-foreground">{dict.code}</div>
+              {dict.description ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{dict.description}</div> : null}
               <div className="mt-2 flex gap-1">
                 <PermissionGate permissions={["system:dict:update"]}>
                   <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); void openDict(dict.id); }}>
+                    <Pencil />
                     编辑
                   </Button>
                 </PermissionGate>
                 <PermissionGate permissions={["system:dict:delete"]}>
-                  <Button size="sm" variant="ghost" disabled={dict.isSystem} onClick={(event) => { event.stopPropagation(); void removeDict(dict.id); }}>
+                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={dict.isSystem} onClick={(event) => { event.stopPropagation(); setDictDeleteTarget(dict); }}>
+                    <Trash2 />
                     删除
                   </Button>
                 </PermissionGate>
@@ -222,11 +287,19 @@ export default function DictPage() {
       <section className="grid gap-4">
         <div className="flex flex-col gap-3 rounded-lg border bg-background p-4 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-2 md:w-80">
-            <span className="text-sm font-medium">{selectedDict?.name ?? "字典项"}</span>
-            <Input value={itemKeyword} onChange={(event) => setItemKeyword(event.target.value)} />
+            <div>
+              <span className="text-sm font-medium">{selectedDict?.name ?? "字典项"}</span>
+              <p className="text-xs text-muted-foreground">{selectedDict?.code ?? "请选择左侧字典"}</p>
+            </div>
+            <Input
+              value={itemKeyword}
+              placeholder="搜索字典项标签或描述"
+              disabled={!selectedDict}
+              onChange={(event) => setItemKeyword(event.target.value)}
+            />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void loadItems()}>
+            <Button variant="outline" onClick={() => void loadItems()} disabled={!selectedDict || itemLoading}>
               <RefreshCw />
               刷新
             </Button>
@@ -244,7 +317,7 @@ export default function DictPage() {
             </PermissionGate>
           </div>
         </div>
-        <DataTable columns={itemColumns} data={items} />
+        <DataTable columns={itemColumns} data={items} loading={itemLoading} emptyText={selectedDict ? "暂无字典项" : "请选择左侧字典"} />
       </section>
 
       <Dialog open={dictOpen} onOpenChange={setDictOpen}>
@@ -269,6 +342,40 @@ export default function DictPage() {
             onSubmit={saveItem}
             onCancel={() => setItemOpen(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!dictDeleteTarget} onOpenChange={(open) => !open && setDictDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除字典</DialogTitle>
+            <DialogDescription>确认删除“{dictDeleteTarget?.name}”？相关字典项也会被删除。</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDictDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button variant="destructive" disabled={deleteSubmitting} onClick={() => void confirmRemoveDict()}>
+              删除
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!itemDeleteTarget} onOpenChange={(open) => !open && setItemDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除字典项</DialogTitle>
+            <DialogDescription>确认删除“{itemDeleteTarget?.label}”？</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setItemDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button variant="destructive" disabled={deleteSubmitting} onClick={() => void confirmRemoveItem()}>
+              删除
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

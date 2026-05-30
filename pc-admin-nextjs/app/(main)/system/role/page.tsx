@@ -20,6 +20,7 @@ import { listDept } from "@/api/system/dept";
 import { listMenu } from "@/api/system/menu";
 import { listAllUser } from "@/api/system/user";
 import { DataTable } from "@/components/table/data-table";
+import { TableActionButton, TableActions } from "@/components/table/table-actions";
 import { PermissionGate } from "@/components/permission/permission-gate";
 import { PermissionTree } from "@/components/system/permission-tree";
 import { RoleForm } from "@/components/system/role-form";
@@ -113,39 +114,30 @@ export default function RolePage() {
         id: "actions",
         header: "操作",
         cell: ({ row }) => (
-          <div className="flex flex-wrap gap-1">
+          <TableActions>
             <PermissionGate permissions={["system:role:update"]}>
-              <Button size="icon" variant="ghost" title="编辑" onClick={() => void openEditor(row.original.id)}>
-                <Pencil />
-              </Button>
+              <TableActionButton icon={Pencil} label="编辑" onClick={() => void openEditor(row.original.id)} />
             </PermissionGate>
             <PermissionGate permissions={["system:role:updatePermission"]}>
-              <Button
-                size="icon"
-                variant="ghost"
-                title="权限"
+              <TableActionButton
+                icon={ShieldCheck}
+                label="权限"
                 onClick={() => void openPermissionDialog(row.original.id)}
-              >
-                <ShieldCheck />
-              </Button>
+              />
             </PermissionGate>
             <PermissionGate permissions={["system:role:assign"]}>
-              <Button size="icon" variant="ghost" title="分配用户" onClick={() => void openAssignedUsers(row.original)}>
-                <UserCheck />
-              </Button>
+              <TableActionButton icon={UserCheck} label="分配用户" onClick={() => void openAssignedUsers(row.original)} />
             </PermissionGate>
             <PermissionGate permissions={["system:role:delete"]}>
-              <Button
-                size="icon"
-                variant="ghost"
-                title="删除"
+              <TableActionButton
+                icon={Trash2}
+                label="删除"
+                destructive
                 disabled={row.original.disabled}
                 onClick={() => void removeRole(row.original.id)}
-              >
-                <Trash2 />
-              </Button>
+              />
             </PermissionGate>
-          </div>
+          </TableActions>
         )
       }
     ],

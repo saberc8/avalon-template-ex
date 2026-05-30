@@ -6,6 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { addDept, deleteDept, exportDept, getDept, listDept, updateDept } from "@/api/system/dept";
 import { DataTable } from "@/components/table/data-table";
+import { TableActionButton, TableActions } from "@/components/table/table-actions";
 import { PermissionGate } from "@/components/permission/permission-gate";
 import { DeptForm } from "@/components/system/dept-form";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -83,24 +84,20 @@ export default function DeptPage() {
         id: "actions",
         header: "操作",
         cell: ({ row }) => (
-          <div className="flex flex-wrap gap-1">
+          <TableActions>
             <PermissionGate permissions={["system:dept:update"]}>
-              <Button size="icon" variant="ghost" title="编辑" onClick={() => void openEditor(row.original.id)}>
-                <Pencil />
-              </Button>
+              <TableActionButton icon={Pencil} label="编辑" onClick={() => void openEditor(row.original.id)} />
             </PermissionGate>
             <PermissionGate permissions={["system:dept:delete"]}>
-              <Button
-                size="icon"
-                variant="ghost"
-                title="删除"
+              <TableActionButton
+                icon={Trash2}
+                label="删除"
+                destructive
                 disabled={row.original.isSystem}
                 onClick={() => void removeDept(row.original.id)}
-              >
-                <Trash2 />
-              </Button>
+              />
             </PermissionGate>
-          </div>
+          </TableActions>
         )
       }
     ],

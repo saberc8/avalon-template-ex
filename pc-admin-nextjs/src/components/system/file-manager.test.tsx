@@ -61,6 +61,18 @@ describe("FileManager", () => {
       })
     );
   });
+
+  it("opens a rename dialog instead of a browser prompt", async () => {
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("renamed");
+
+    render(<FileManager />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "重命名" }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "重命名" })).toBeTruthy();
+    expect(screen.getByDisplayValue("reports")).toBeTruthy();
+  });
 });
 
 function folderItem(): FileItem {

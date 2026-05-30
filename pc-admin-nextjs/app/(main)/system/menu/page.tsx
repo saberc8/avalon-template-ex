@@ -6,6 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { addMenu, clearMenuCache, deleteMenu, getMenu, listMenu, updateMenu } from "@/api/system/menu";
 import { DataTable } from "@/components/table/data-table";
+import { TableActionButton, TableActions } from "@/components/table/table-actions";
 import { PermissionGate } from "@/components/permission/permission-gate";
 import { MenuForm } from "@/components/system/menu-form";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -93,18 +94,14 @@ export default function MenuPage() {
         id: "actions",
         header: "操作",
         cell: ({ row }) => (
-          <div className="flex flex-wrap gap-1">
+          <TableActions>
             <PermissionGate permissions={["system:menu:update"]}>
-              <Button size="icon" variant="ghost" title="编辑" onClick={() => void openEditor(row.original.id)}>
-                <Pencil />
-              </Button>
+              <TableActionButton icon={Pencil} label="编辑" onClick={() => void openEditor(row.original.id)} />
             </PermissionGate>
             <PermissionGate permissions={["system:menu:delete"]}>
-              <Button size="icon" variant="ghost" title="删除" onClick={() => void removeMenu(row.original.id)}>
-                <Trash2 />
-              </Button>
+              <TableActionButton icon={Trash2} label="删除" destructive onClick={() => void removeMenu(row.original.id)} />
             </PermissionGate>
-          </div>
+          </TableActions>
         )
       }
     ],
