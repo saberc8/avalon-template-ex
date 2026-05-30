@@ -125,7 +125,7 @@ VITE_API_BASE_URL=http://localhost:4398
 
 ## 7. 启动 Next.js 管理端（pc-admin-nextjs）
 
-Next.js 管理端基于 App Router，默认端口 `3000`：
+Next.js 管理端基于 App Router，默认端口 `4399`：
 
 ```bash
 cd pc-admin-nextjs
@@ -190,4 +190,3 @@ pnpm dev
 ```
 
 如需切换为 Go 或 Java 后端，只需在前端环境变量中调整 API 地址并启动对应后端即可，无需修改前端代码。 
-

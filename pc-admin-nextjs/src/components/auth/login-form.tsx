@@ -1,13 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Activity, Layers3, LockKeyhole, LogIn, ShieldCheck, User } from "lucide-react";
+import { Activity, Layers3, LockKeyhole, LogIn, RefreshCw, ShieldCheck, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { accountLogin, getUserInfo, getUserRoutes } from "@/api/auth";
+import { accountLogin, getImageCaptcha, getUserInfo, getUserRoutes } from "@/api/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { getToken, setToken } from "@/lib/auth";
 import { firstAccessiblePath } from "@/lib/menu";
 import { cn } from "@/lib/utils";
+import type { ImageCaptchaResponse } from "@/types/auth";
 
 const loginSchema = z.object({
   username: z.string().min(1, "请输入用户名"),
@@ -34,27 +35,47 @@ type LoginValues = z.infer<typeof loginSchema>;
 export function LoginForm({ className }: { className?: string }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [captcha, setCaptcha] = useState<ImageCaptchaResponse | null>(null);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const captchaEnabled = captcha?.isEnabled ?? false;
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "admin",
       password: "admin123",
-      captcha: "local"
+      captcha: ""
     }
   });
+
+  async function refreshCaptcha() {
+    setCaptchaLoading(true);
+    try {
+      setCaptcha(await getImageCaptcha());
+      form.setValue("captcha", "");
+    } catch (error) {
+      setCaptcha(null);
+      toast.error(error instanceof Error ? error.message : "验证码加载失败");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (getToken()) {
       router.replace("/dashboard/workplace");
+      return;
     }
+    void refreshCaptcha();
   }, [router]);
 
   async function onSubmit(values: LoginValues) {
     setSubmitting(true);
     try {
       const loginResult = await accountLogin({
-        ...values,
-        uuid: values.captcha ? "local" : undefined
+        username: values.username,
+        password: values.password,
+        captcha: captchaEnabled ? values.captcha : undefined,
+        uuid: captchaEnabled ? captcha?.uuid : undefined
       });
       setToken(loginResult.token);
 
@@ -65,6 +86,7 @@ export function LoginForm({ className }: { className?: string }) {
       const message = error instanceof Error ? error.message : "登录失败";
       form.setError("root", { message });
       toast.error(message);
+      void refreshCaptcha();
     } finally {
       setSubmitting(false);
     }
@@ -118,22 +140,40 @@ export function LoginForm({ className }: { className?: string }) {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="captcha"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>验证码</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input className="pl-9" autoComplete="one-time-code" {...field} />
+                {captchaEnabled ? (
+                  <FormField
+                    control={form.control}
+                    name="captcha"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>验证码</FormLabel>
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                          <div className="relative">
+                            <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <FormControl>
+                              <Input className="pl-9" autoComplete="one-time-code" {...field} />
+                            </FormControl>
+                          </div>
+                          <Button
+                            aria-label="刷新验证码"
+                            className="h-9 w-28 overflow-hidden p-0"
+                            disabled={captchaLoading}
+                            onClick={() => void refreshCaptcha()}
+                            type="button"
+                            variant="outline"
+                          >
+                            {captcha?.img ? (
+                              <img alt="验证码" className="h-full w-full object-cover" src={captcha.img} />
+                            ) : (
+                              <RefreshCw className={cn(captchaLoading && "animate-spin")} />
+                            )}
+                          </Button>
                         </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
                 {form.formState.errors.root?.message ? (
                   <p className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {form.formState.errors.root.message}

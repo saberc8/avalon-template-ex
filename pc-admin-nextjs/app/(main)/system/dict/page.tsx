@@ -215,8 +215,11 @@ export default function DictPage() {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-4 lg:grid-cols-[340px_1fr]">
-      <section className="rounded-lg border bg-background p-4">
+    <div
+      className="mx-auto grid w-full max-w-7xl items-start gap-4 lg:grid-cols-[340px_1fr]"
+      data-testid="dict-layout"
+    >
+      <section className="self-start rounded-lg border bg-background p-4" data-testid="dict-list-panel">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold">字典</h2>
@@ -248,34 +251,51 @@ export default function DictPage() {
           {dicts.map((dict) => (
             <div
               key={dict.id}
-              role="button"
-              tabIndex={0}
-              className={`rounded-md border p-3 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${selectedDict?.id === dict.id ? "border-primary bg-primary/5" : "bg-background"}`}
-              onClick={() => setSelectedDict(dict)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSelectedDict(dict);
-                }
-              }}
+              className={`group relative rounded-md border text-sm transition-colors ${selectedDict?.id === dict.id ? "border-primary bg-primary/5" : "bg-background hover:bg-muted/35"}`}
+              data-testid={`dict-card-${dict.id}`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-medium">{dict.name}</div>
-                {dict.isSystem ? <Badge variant="secondary">系统</Badge> : null}
-              </div>
-              <div className="text-xs text-muted-foreground">{dict.code}</div>
-              {dict.description ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{dict.description}</div> : null}
-              <div className="mt-2 flex gap-1">
+              <button
+                type="button"
+                aria-pressed={selectedDict?.id === dict.id}
+                className="block w-full rounded-md p-3 pr-20 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => setSelectedDict(dict)}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="truncate font-medium">{dict.name}</div>
+                  {dict.isSystem ? <Badge variant="secondary">系统</Badge> : null}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">{dict.code}</div>
+                {dict.description ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{dict.description}</div> : null}
+              </button>
+              <div
+                className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                data-testid={`dict-card-actions-${dict.id}`}
+              >
                 <PermissionGate permissions={["system:dict:update"]}>
-                  <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); void openDict(dict.id); }}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`编辑 ${dict.name}`}
+                    title="编辑"
+                    className="size-8 bg-background/85 shadow-sm hover:bg-muted"
+                    onClick={() => void openDict(dict.id)}
+                  >
                     <Pencil />
-                    编辑
                   </Button>
                 </PermissionGate>
                 <PermissionGate permissions={["system:dict:delete"]}>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={dict.isSystem} onClick={(event) => { event.stopPropagation(); setDictDeleteTarget(dict); }}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`删除 ${dict.name}`}
+                    title="删除"
+                    className="size-8 bg-background/85 text-destructive shadow-sm hover:bg-destructive/10 hover:text-destructive"
+                    disabled={dict.isSystem}
+                    onClick={() => setDictDeleteTarget(dict)}
+                  >
                     <Trash2 />
-                    删除
                   </Button>
                 </PermissionGate>
               </div>
@@ -284,7 +304,7 @@ export default function DictPage() {
         </div>
       </section>
 
-      <section className="grid gap-4">
+      <section className="grid self-start content-start gap-4" data-testid="dict-items-panel">
         <div className="flex flex-col gap-3 rounded-lg border bg-background p-4 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-2 md:w-80">
             <div>

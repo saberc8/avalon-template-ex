@@ -152,7 +152,7 @@ VITE_API_BASE_URL=http://localhost:4398
 
 ### 4.2 Next.js 管理端：`pc-admin-nextjs`
 
-默认开发端口：`3000`。
+默认开发端口：`4399`。
 
 ```bash
 cd pc-admin-nextjs
@@ -167,7 +167,7 @@ pnpm dev
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4398 pnpm dev
 ```
 
-启动后访问：`http://localhost:3000`。
+启动后访问：`http://localhost:4399`。
 
 ---
 

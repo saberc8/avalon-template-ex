@@ -7,6 +7,7 @@ edition = "2021"
 anyhow = "1"
 async-trait = "0.1"
 axum = { version = "0.7", features = ["macros", "multipart"] }
+base64 = "0.22"
 bcrypt = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"

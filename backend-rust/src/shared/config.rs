@@ -3,7 +3,7 @@ use std::env;
 use anyhow::{bail, Context, Result};
 
 const DEFAULT_CORS_ALLOWED_ORIGINS: &str =
-    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173";
+    "http://localhost:4399,http://127.0.0.1:4399,http://localhost:5173,http://127.0.0.1:5173";
 const JWT_SECRET_PLACEHOLDER: &str = "dev-only-change-me";
 const JWT_SECRET_MIN_LEN: usize = 32;
 
@@ -145,6 +145,14 @@ mod tests {
     fn db_auto_migrate_accepts_true() {
         assert!(parse_bool_env(Some("true"), false).unwrap());
         assert!(parse_bool_env(Some("1"), false).unwrap());
+    }
+
+    #[test]
+    fn default_cors_allowed_origins_include_nextjs_dev_port() {
+        let origins = parse_cors_allowed_origins(DEFAULT_CORS_ALLOWED_ORIGINS);
+
+        assert!(origins.contains(&"http://localhost:4399".to_owned()));
+        assert!(origins.contains(&"http://127.0.0.1:4399".to_owned()));
     }
 
     #[test]

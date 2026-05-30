@@ -53,3 +53,10 @@ export interface LoginResponse {
   token: string;
   expire: string;
 }
+
+export interface ImageCaptchaResponse {
+  uuid: string;
+  img: string;
+  expireTime: number;
+  isEnabled: boolean;
+}

@@ -327,7 +327,7 @@ mod system {
 async fn system_routes_are_registered_and_use_response_envelope_for_missing_auth() {
     let app = build_router(
         test_pool(),
-        &["http://localhost:3000".to_owned()],
+        &["http://localhost:4399".to_owned()],
         test_jwt(),
     )
     .unwrap();
@@ -484,7 +484,7 @@ async fn real_system_role_list_success_path_uses_vue_envelope() {
         .expect("connect to seeded PostgreSQL test database");
     let jwt = test_jwt();
     let token = jwt.issue(1, "admin").expect("issue test JWT");
-    let app = build_router(db, &["http://localhost:3000".to_owned()], jwt).unwrap();
+    let app = build_router(db, &["http://localhost:4399".to_owned()], jwt).unwrap();
 
     let response = app
         .oneshot(
@@ -522,7 +522,7 @@ async fn real_system_role_user_list_success_path_uses_vue_page_envelope() {
         .expect("connect to seeded PostgreSQL test database");
     let jwt = test_jwt();
     let token = jwt.issue(1, "admin").expect("issue test JWT");
-    let app = build_router(db, &["http://localhost:3000".to_owned()], jwt).unwrap();
+    let app = build_router(db, &["http://localhost:4399".to_owned()], jwt).unwrap();
 
     let response = app
         .oneshot(
@@ -592,7 +592,7 @@ VALUES ($1, 'rust_role_assign_test', 'Rust角色分配测试', 0, 1, FALSE, 'rol
 
     let jwt = test_jwt();
     let token = jwt.issue(1, "admin").expect("issue test JWT");
-    let app = build_router(db.clone(), &["http://localhost:3000".to_owned()], jwt).unwrap();
+    let app = build_router(db.clone(), &["http://localhost:4399".to_owned()], jwt).unwrap();
 
     let assign = app
         .clone()
@@ -704,7 +704,7 @@ LIMIT 1;
 
     let jwt = test_jwt();
     let token = jwt.issue(1, "admin").expect("issue test JWT");
-    let app = build_router(db.clone(), &["http://localhost:3000".to_owned()], jwt).unwrap();
+    let app = build_router(db.clone(), &["http://localhost:4399".to_owned()], jwt).unwrap();
 
     let assign_admin = app
         .clone()

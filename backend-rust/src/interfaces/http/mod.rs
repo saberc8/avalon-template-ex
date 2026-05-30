@@ -190,7 +190,7 @@ mod tests {
     async fn health_route_returns_success_envelope() {
         let app = build_router(
             test_pool(),
-            &["http://localhost:3000".to_owned()],
+            &["http://localhost:4399".to_owned()],
             test_jwt(),
         )
         .unwrap();
@@ -221,7 +221,7 @@ mod tests {
             .acquire_timeout(Duration::from_millis(100))
             .connect_lazy("postgres://postgres:postgres@127.0.0.1:1/avalon_admin")
             .unwrap();
-        let app = build_router(db, &["http://localhost:3000".to_owned()], test_jwt()).unwrap();
+        let app = build_router(db, &["http://localhost:4399".to_owned()], test_jwt()).unwrap();
 
         let response = app
             .oneshot(
@@ -247,7 +247,7 @@ mod tests {
     async fn unmatched_route_returns_vue_failure_envelope() {
         let app = build_router(
             test_pool(),
-            &["http://localhost:3000".to_owned()],
+            &["http://localhost:4399".to_owned()],
             test_jwt(),
         )
         .unwrap();
@@ -275,7 +275,7 @@ mod tests {
     async fn axum_rejections_return_vue_failure_envelope() {
         let app = build_router(
             test_pool(),
-            &["http://localhost:3000".to_owned()],
+            &["http://localhost:4399".to_owned()],
             test_jwt(),
         )
         .unwrap();
@@ -305,7 +305,7 @@ mod tests {
     async fn wrapped_axum_rejection_preserves_cors_headers() {
         let app = build_router(
             test_pool(),
-            &["http://localhost:3000".to_owned()],
+            &["http://localhost:4399".to_owned()],
             test_jwt(),
         )
         .unwrap();
@@ -315,7 +315,7 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .uri("/auth/login")
-                    .header(header::ORIGIN, "http://localhost:3000")
+                    .header(header::ORIGIN, "http://localhost:4399")
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from("{"))
                     .unwrap(),
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
-            Some(&"http://localhost:3000".parse().unwrap())
+            Some(&"http://localhost:4399".parse().unwrap())
         );
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = serde_json::from_slice::<Value>(&body).unwrap();
@@ -338,7 +338,7 @@ mod tests {
     async fn method_not_allowed_returns_vue_failure_envelope() {
         let app = build_router(
             test_pool(),
-            &["http://localhost:3000".to_owned()],
+            &["http://localhost:4399".to_owned()],
             test_jwt(),
         )
         .unwrap();
@@ -367,7 +367,7 @@ mod tests {
     async fn cors_allows_configured_origins_only() {
         let app = build_router(
             test_pool(),
-            &["http://localhost:3000".to_owned()],
+            &["http://localhost:4399".to_owned()],
             test_jwt(),
         )
         .unwrap();
@@ -378,7 +378,7 @@ mod tests {
                 Request::builder()
                     .method(Method::OPTIONS)
                     .uri("/health")
-                    .header(header::ORIGIN, "http://localhost:3000")
+                    .header(header::ORIGIN, "http://localhost:4399")
                     .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
                     .body(Body::empty())
                     .unwrap(),
@@ -388,7 +388,7 @@ mod tests {
 
         assert_eq!(
             allowed.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
-            Some(&"http://localhost:3000".parse().unwrap())
+            Some(&"http://localhost:4399".parse().unwrap())
         );
 
         let disallowed = app

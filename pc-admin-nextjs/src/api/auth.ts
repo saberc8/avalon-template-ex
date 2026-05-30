@@ -1,5 +1,11 @@
 import { api } from "@/lib/api";
-import type { AccountLoginRequest, LoginResponse, RouteItem, UserInfo } from "@/types/auth";
+import type {
+  AccountLoginRequest,
+  ImageCaptchaResponse,
+  LoginResponse,
+  RouteItem,
+  UserInfo
+} from "@/types/auth";
 
 const DEFAULT_CLIENT_ID = "default";
 
@@ -9,6 +15,10 @@ export function accountLogin(request: AccountLoginRequest) {
     clientId: request.clientId || process.env.NEXT_PUBLIC_CLIENT_ID || DEFAULT_CLIENT_ID,
     authType: "ACCOUNT"
   });
+}
+
+export function getImageCaptcha() {
+  return api.get<ImageCaptchaResponse>("/captcha/image");
 }
 
 export function logout() {
