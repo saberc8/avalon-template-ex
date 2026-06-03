@@ -2,6 +2,7 @@
 name = "backend-rust"
 version = "0.1.0"
 edition = "2021"
+default-run = "backend-rust"
 
 [dependencies]
 anyhow = "1"
@@ -11,9 +12,13 @@ base64 = "0.22"
 bcrypt = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
+futures-util = "0.3"
+futures-lite = "2"
 jsonwebtoken = "9"
+lapin = "2"
 mime_guess = "2"
 rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
@@ -23,6 +28,7 @@ tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 
 [dev-dependencies]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flattenTree, mapTree } from "@/lib/tree";
+import { flattenTree, flattenVisibleTree, mapTree } from "@/lib/tree";
 
 interface Node {
   id: number;
@@ -45,5 +45,24 @@ describe("tree helpers", () => {
         ]
       }
     ]);
+  });
+
+  it("flattens only visible tree nodes when parents are collapsed", () => {
+    expect(
+      flattenVisibleTree(tree, new Set([3])).map((item) => [
+        item.node.id,
+        item.depth,
+        item.hasChildren,
+        item.expanded
+      ])
+    ).toEqual([
+      [1, 0, true, true],
+      [2, 1, false, false],
+      [3, 1, true, false]
+    ]);
+  });
+
+  it("hides all descendants when a root node is collapsed", () => {
+    expect(flattenVisibleTree(tree, new Set([1])).map((item) => item.node.id)).toEqual([1]);
   });
 });

@@ -4,6 +4,7 @@ import {
   AppWindow,
   Bookmark,
   ChevronRight,
+  Clock3,
   File,
   HardDrive,
   History,
@@ -62,6 +63,7 @@ type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 const ICONS: Record<string, IconComponent> = {
   apps: LayoutGrid,
   bookmark: Bookmark,
+  clock: Clock3,
   computer: Monitor,
   config: SlidersHorizontal,
   file: File,

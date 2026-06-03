@@ -125,10 +125,10 @@ fn user_command_normalization_rejects_empty_required_fields() {
 }
 
 #[test]
-fn admin_role_id_can_be_assigned_through_user_management() {
+fn admin_role_id_cannot_be_assigned_through_user_management() {
     let result = ensure_user_role_ids_can_be_assigned(&[1, 2]);
 
-    assert!(result.is_ok());
+    assert!(matches!(result, Err(AppError::BadRequest(_))));
 }
 
 #[test]

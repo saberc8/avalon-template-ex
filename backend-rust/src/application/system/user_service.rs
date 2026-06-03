@@ -528,6 +528,9 @@ pub fn ensure_user_role_ids_can_be_assigned(role_ids: &[i64]) -> Result<(), AppE
     if role_ids.iter().any(|role_id| *role_id <= 0) {
         return Err(AppError::bad_request("角色ID参数不正确"));
     }
+    if role_ids.contains(&1) {
+        return Err(AppError::bad_request("系统管理员角色不允许分配"));
+    }
     Ok(())
 }
 
@@ -569,6 +572,9 @@ async fn ensure_role_ids_assignable(
     role_ids: &[i64],
 ) -> Result<(), AppError> {
     ensure_user_role_ids_can_be_assigned(role_ids)?;
+    if users.role_ids_contain_admin(role_ids).await? {
+        return Err(AppError::bad_request("系统管理员角色不允许分配"));
+    }
     let missing = users.missing_role_ids(role_ids).await?;
     if let Some(role_id) = missing.first() {
         return Err(AppError::bad_request(format!("角色 [{role_id}] 不存在")));

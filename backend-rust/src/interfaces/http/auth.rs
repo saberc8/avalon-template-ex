@@ -21,7 +21,7 @@ use crate::{
     shared::{error::AppError, response::ApiResponse},
 };
 
-use super::AppState;
+use super::{captcha, AppState};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -81,6 +81,13 @@ async fn login(
     headers: HeaderMap,
     Json(req): Json<LoginReq>,
 ) -> Result<Json<ApiResponse<LoginResp>>, AppError> {
+    captcha::ensure_login_captcha(
+        &state,
+        req.uuid.as_deref().or(req.captcha_key.as_deref()),
+        req.captcha.as_deref(),
+    )
+    .await?;
+
     let service = AuthService::new(state.db, state.jwt);
     let meta = LoginMeta {
         ip: client_ip(&headers),

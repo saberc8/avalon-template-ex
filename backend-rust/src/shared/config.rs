@@ -16,6 +16,22 @@ pub struct AppConfig {
     pub cors_allowed_origins: Vec<String>,
     pub auth_jwt_secret: String,
     pub auth_jwt_ttl_hours: u64,
+    pub scheduler_embedded: bool,
+    pub scheduler_worker_enabled: bool,
+    pub scheduler_tick_seconds: u64,
+    pub scheduler_batch_size: i64,
+    pub scheduler_worker_id: String,
+    pub scheduler_http_allowlist_mode: String,
+    pub scheduler_http_allowlist: Vec<String>,
+    pub rabbitmq_url: String,
+    pub rabbitmq_exchange: String,
+    pub rabbitmq_execute_queue: String,
+    pub rabbitmq_retry_queue: String,
+    pub rabbitmq_dead_queue: String,
+    pub rabbitmq_execute_routing_key: String,
+    pub rabbitmq_retry_routing_key: String,
+    pub rabbitmq_dead_routing_key: String,
+    pub rabbitmq_retry_ttl_ms: u32,
 }
 
 impl AppConfig {
@@ -44,6 +60,44 @@ impl AppConfig {
             "AUTH_JWT_TTL_HOURS",
             &env::var("AUTH_JWT_TTL_HOURS").unwrap_or_else(|_| "24".to_owned()),
         )?;
+        let scheduler_embedded =
+            parse_bool_env(env::var("SCHEDULER_EMBEDDED").ok().as_deref(), false)?;
+        let scheduler_worker_enabled =
+            parse_bool_env(env::var("SCHEDULER_WORKER_ENABLED").ok().as_deref(), true)?;
+        let scheduler_tick_seconds = parse_positive_u64_env(
+            "SCHEDULER_TICK_SECONDS",
+            &env::var("SCHEDULER_TICK_SECONDS").unwrap_or_else(|_| "5".to_owned()),
+        )?;
+        let scheduler_batch_size = parse_positive_i64_env(
+            "SCHEDULER_BATCH_SIZE",
+            &env::var("SCHEDULER_BATCH_SIZE").unwrap_or_else(|_| "50".to_owned()),
+        )?;
+        let scheduler_worker_id = env::var("SCHEDULER_WORKER_ID")
+            .unwrap_or_else(|_| format!("worker-{}", std::process::id()));
+        let scheduler_http_allowlist_mode =
+            env::var("SCHEDULER_HTTP_ALLOWLIST_MODE").unwrap_or_else(|_| "default".to_owned());
+        let scheduler_http_allowlist =
+            parse_cors_allowed_origins(&env::var("SCHEDULER_HTTP_ALLOWLIST").unwrap_or_default());
+        let rabbitmq_url = env::var("RABBITMQ_URL")
+            .unwrap_or_else(|_| "amqp://guest:guest@127.0.0.1:5672/%2f".to_owned());
+        let rabbitmq_exchange =
+            env::var("RABBITMQ_EXCHANGE").unwrap_or_else(|_| "avalon.scheduler".to_owned());
+        let rabbitmq_execute_queue = env::var("RABBITMQ_SCHEDULER_EXECUTE_QUEUE")
+            .unwrap_or_else(|_| "avalon.scheduler.execute".to_owned());
+        let rabbitmq_retry_queue = env::var("RABBITMQ_SCHEDULER_RETRY_QUEUE")
+            .unwrap_or_else(|_| "avalon.scheduler.retry".to_owned());
+        let rabbitmq_dead_queue = env::var("RABBITMQ_SCHEDULER_DEAD_QUEUE")
+            .unwrap_or_else(|_| "avalon.scheduler.dead".to_owned());
+        let rabbitmq_execute_routing_key = env::var("RABBITMQ_SCHEDULER_EXECUTE_ROUTING_KEY")
+            .unwrap_or_else(|_| "scheduler.execute".to_owned());
+        let rabbitmq_retry_routing_key = env::var("RABBITMQ_SCHEDULER_RETRY_ROUTING_KEY")
+            .unwrap_or_else(|_| "scheduler.retry".to_owned());
+        let rabbitmq_dead_routing_key = env::var("RABBITMQ_SCHEDULER_DEAD_ROUTING_KEY")
+            .unwrap_or_else(|_| "scheduler.dead".to_owned());
+        let rabbitmq_retry_ttl_ms = parse_positive_u32_env(
+            "RABBITMQ_SCHEDULER_RETRY_TTL_MS",
+            &env::var("RABBITMQ_SCHEDULER_RETRY_TTL_MS").unwrap_or_else(|_| "30000".to_owned()),
+        )?;
 
         if cors_allowed_origins.is_empty() {
             bail!("CORS_ALLOWED_ORIGINS must include at least one origin");
@@ -57,6 +111,22 @@ impl AppConfig {
             cors_allowed_origins,
             auth_jwt_secret,
             auth_jwt_ttl_hours,
+            scheduler_embedded,
+            scheduler_worker_enabled,
+            scheduler_tick_seconds,
+            scheduler_batch_size,
+            scheduler_worker_id,
+            scheduler_http_allowlist_mode,
+            scheduler_http_allowlist,
+            rabbitmq_url,
+            rabbitmq_exchange,
+            rabbitmq_execute_queue,
+            rabbitmq_retry_queue,
+            rabbitmq_dead_queue,
+            rabbitmq_execute_routing_key,
+            rabbitmq_retry_routing_key,
+            rabbitmq_dead_routing_key,
+            rabbitmq_retry_ttl_ms,
         })
     }
 }
@@ -97,6 +167,30 @@ fn parse_bool_env(raw: Option<&str>, default: bool) -> Result<bool> {
 fn parse_positive_u64_env(name: &str, raw: &str) -> Result<u64> {
     let value = raw
         .parse::<u64>()
+        .with_context(|| format!("{name} must be a positive integer"))?;
+
+    if value == 0 {
+        bail!("{name} must be a positive integer");
+    }
+
+    Ok(value)
+}
+
+fn parse_positive_i64_env(name: &str, raw: &str) -> Result<i64> {
+    let value = raw
+        .parse::<i64>()
+        .with_context(|| format!("{name} must be a positive integer"))?;
+
+    if value <= 0 {
+        bail!("{name} must be a positive integer");
+    }
+
+    Ok(value)
+}
+
+fn parse_positive_u32_env(name: &str, raw: &str) -> Result<u32> {
+    let value = raw
+        .parse::<u32>()
         .with_context(|| format!("{name} must be a positive integer"))?;
 
     if value == 0 {
@@ -196,5 +290,12 @@ mod tests {
             parse_auth_jwt_secret(Some("local-dev-only-change-this-secret-32chars-min")).unwrap();
 
         assert_eq!(secret, "local-dev-only-change-this-secret-32chars-min");
+    }
+
+    #[test]
+    fn scheduler_batch_size_rejects_zero() {
+        let err = parse_positive_i64_env("SCHEDULER_BATCH_SIZE", "0").unwrap_err();
+
+        assert!(err.to_string().contains("positive"));
     }
 }

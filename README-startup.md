@@ -142,6 +142,12 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:4398
 
 具体变量名请参考 `pc-admin-nextjs` 项目内的 README 或 `.env.example` 文件。
 
+### Rust + Next.js 接口约定
+
+Rust 后端为了兼容现有管理端协议，JSON API 统一返回 `code` / `data` / `msg` / `success` / `timestamp` envelope。业务错误（如 `401`、`403`、`500`）默认仍使用 HTTP 200，但 `code` 会返回对应业务码，前端必须以 `code !== "200"` 或 `success === false` 判断失败，不能只看 HTTP 状态码。
+
+文件下载等传输类接口可以继续按 HTTP 状态处理失败。
+
 ---
 
 ## 8. 其他前端与客户端

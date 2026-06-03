@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FilePlus2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, FilePlus2, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
@@ -27,10 +27,10 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { saveBlob } from "@/lib/download";
-import { flattenTree } from "@/lib/tree";
+import { flattenVisibleTree } from "@/lib/tree";
 import type { DeptCommand, DeptResp } from "@/types/system";
 
-type DeptRow = DeptResp & { depth: number };
+type DeptRow = DeptResp & { depth: number; hasChildren: boolean; expanded: boolean };
 
 export default function DeptPage() {
   const [depts, setDepts] = useState<DeptResp[]>([]);
@@ -40,6 +40,7 @@ export default function DeptPage() {
   const [saving, setSaving] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DeptResp | null>(null);
+  const [collapsedDeptIds, setCollapsedDeptIds] = useState<Set<number>>(new Set());
 
   const loadDepts = useCallback(async () => {
     setLoading(true);
@@ -62,8 +63,14 @@ export default function DeptPage() {
   }, [loadDepts]);
 
   const rows = useMemo<DeptRow[]>(
-    () => flattenTree(depts).map(({ node, depth }) => ({ ...node, depth })),
-    [depts]
+    () =>
+      flattenVisibleTree(depts, collapsedDeptIds).map(({ node, depth, hasChildren, expanded }) => ({
+        ...node,
+        depth,
+        hasChildren,
+        expanded
+      })),
+    [collapsedDeptIds, depts]
   );
 
   const columns = useMemo<ColumnDef<DeptRow>[]>(
@@ -71,7 +78,24 @@ export default function DeptPage() {
       {
         header: "部门名称",
         cell: ({ row }) => (
-          <span style={{ paddingLeft: row.original.depth * 20 }}>{row.original.name}</span>
+          <div className="flex items-center gap-2" style={{ paddingLeft: row.original.depth * 20 }}>
+            {row.original.hasChildren ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-expanded={row.original.expanded}
+                aria-label={`${row.original.expanded ? "收起" : "展开"} ${row.original.name}`}
+                className="size-7 shrink-0"
+                onClick={() => toggleDept(row.original.id)}
+              >
+                {row.original.expanded ? <ChevronDown /> : <ChevronRight />}
+              </Button>
+            ) : (
+              <span className="size-7 shrink-0" aria-hidden="true" />
+            )}
+            <span>{row.original.name}</span>
+          </div>
         )
       },
       { accessorKey: "sort", header: "排序" },
@@ -103,6 +127,18 @@ export default function DeptPage() {
     ],
     []
   );
+
+  function toggleDept(id: number) {
+    setCollapsedDeptIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function openEditor(id?: number) {
     if (!id) {

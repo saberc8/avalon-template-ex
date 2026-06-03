@@ -1,8 +1,11 @@
 use std::net::SocketAddr;
 
 use backend_rust::{
+    application::scheduler::runtime::{
+        http_safety_from_config, rabbitmq_from_config, spawn_scheduler_runtime,
+    },
     infrastructure::{db::init_pool, security::jwt::JwtService},
-    interfaces::http::build_router,
+    interfaces::http::build_router_with_scheduler_http_safety,
     shared::config::AppConfig,
 };
 use tokio::net::TcpListener;
@@ -21,7 +24,23 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let jwt = JwtService::new(config.auth_jwt_secret.clone(), config.auth_jwt_ttl_hours);
-    let app = build_router(db, &config.cors_allowed_origins, jwt)?;
+    let scheduler_http_safety = http_safety_from_config(&config)?;
+    if config.scheduler_embedded {
+        spawn_scheduler_runtime(
+            db.clone(),
+            scheduler_http_safety.clone(),
+            rabbitmq_from_config(&config),
+            config.scheduler_worker_id.clone(),
+            config.scheduler_tick_seconds,
+            config.scheduler_batch_size,
+        );
+    }
+    let app = build_router_with_scheduler_http_safety(
+        db,
+        &config.cors_allowed_origins,
+        jwt,
+        scheduler_http_safety,
+    )?;
     let addr = SocketAddr::from(([0, 0, 0, 0], config.http_port));
     let listener = TcpListener::bind(addr).await?;
 

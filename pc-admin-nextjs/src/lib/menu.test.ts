@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findRouteTrail, firstAccessiblePath, flattenVisibleRoutes } from "@/lib/menu";
+import { findRouteTrail, firstAccessiblePath, flattenVisibleRoutes, isPathAccessible } from "@/lib/menu";
 import type { RouteItem } from "@/types/auth";
 
 const routes: RouteItem[] = [
@@ -167,5 +167,12 @@ describe("menu helpers", () => {
 
   it("finds the current route trail by pathname", () => {
     expect(findRouteTrail(routes, "/system/user").map((route) => route.title)).toEqual(["系统管理", "用户管理"]);
+  });
+
+  it("checks whether a direct pathname is accessible from dynamic routes", () => {
+    expect(isPathAccessible(routes, "/system/user")).toBe(true);
+    expect(isPathAccessible(routes, "/system/user/detail")).toBe(true);
+    expect(isPathAccessible(routes, "/dashboard/workplace")).toBe(true);
+    expect(isPathAccessible(routes, "/system/role")).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { Eraser, FilePlus2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Eraser, FilePlus2, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
@@ -26,10 +26,10 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { flattenTree } from "@/lib/tree";
+import { flattenVisibleTree } from "@/lib/tree";
 import type { MenuCommand, MenuResp } from "@/types/system";
 
-type MenuRow = MenuResp & { depth: number };
+type MenuRow = MenuResp & { depth: number; hasChildren: boolean; expanded: boolean };
 
 const typeLabels: Record<number, string> = {
   1: "目录",
@@ -45,6 +45,7 @@ export default function MenuPage() {
   const [saving, setSaving] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<MenuResp | null>(null);
+  const [collapsedMenuIds, setCollapsedMenuIds] = useState<Set<number>>(new Set());
 
   const loadMenus = useCallback(async () => {
     setLoading(true);
@@ -67,8 +68,14 @@ export default function MenuPage() {
   }, [loadMenus]);
 
   const rows = useMemo<MenuRow[]>(
-    () => flattenTree(menus).map(({ node, depth }) => ({ ...node, depth })),
-    [menus]
+    () =>
+      flattenVisibleTree(menus, collapsedMenuIds).map(({ node, depth, hasChildren, expanded }) => ({
+        ...node,
+        depth,
+        hasChildren,
+        expanded
+      })),
+    [collapsedMenuIds, menus]
   );
 
   const columns = useMemo<ColumnDef<MenuRow>[]>(
@@ -76,7 +83,24 @@ export default function MenuPage() {
       {
         header: "菜单名称",
         cell: ({ row }) => (
-          <span style={{ paddingLeft: row.original.depth * 20 }}>{row.original.title}</span>
+          <div className="flex items-center gap-2" style={{ paddingLeft: row.original.depth * 20 }}>
+            {row.original.hasChildren ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-expanded={row.original.expanded}
+                aria-label={`${row.original.expanded ? "收起" : "展开"} ${row.original.title}`}
+                className="size-7 shrink-0"
+                onClick={() => toggleMenu(row.original.id)}
+              >
+                {row.original.expanded ? <ChevronDown /> : <ChevronRight />}
+              </Button>
+            ) : (
+              <span className="size-7 shrink-0" aria-hidden="true" />
+            )}
+            <span>{row.original.title}</span>
+          </div>
         )
       },
       {
@@ -107,6 +131,18 @@ export default function MenuPage() {
     ],
     []
   );
+
+  function toggleMenu(id: number) {
+    setCollapsedMenuIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function openEditor(id?: number) {
     if (!id) {

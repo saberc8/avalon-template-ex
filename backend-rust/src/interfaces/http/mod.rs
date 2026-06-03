@@ -16,6 +16,7 @@ use tower_http::{
 };
 
 use crate::{
+    application::scheduler::http_safety::HttpSafetyConfig,
     infrastructure::security::jwt::JwtService,
     shared::{error::AppError, response::ApiResponse},
 };
@@ -29,6 +30,7 @@ pub mod middleware {
     pub mod permission;
 }
 pub mod monitor;
+pub mod scheduler;
 pub mod system;
 pub mod user_profile;
 
@@ -36,6 +38,8 @@ pub mod user_profile;
 pub struct AppState {
     pub db: PgPool,
     pub jwt: JwtService,
+    pub captcha: captcha::CaptchaStore,
+    pub scheduler_http_safety: HttpSafetyConfig,
 }
 
 pub fn build_router(
@@ -43,8 +47,27 @@ pub fn build_router(
     cors_allowed_origins: &[String],
     jwt: JwtService,
 ) -> Result<Router> {
+    build_router_with_scheduler_http_safety(
+        db,
+        cors_allowed_origins,
+        jwt,
+        HttpSafetyConfig::default(),
+    )
+}
+
+pub fn build_router_with_scheduler_http_safety(
+    db: PgPool,
+    cors_allowed_origins: &[String],
+    jwt: JwtService,
+    scheduler_http_safety: HttpSafetyConfig,
+) -> Result<Router> {
     let cors = cors_layer(cors_allowed_origins)?;
-    let state = AppState { db, jwt };
+    let state = AppState {
+        db,
+        jwt,
+        captcha: captcha::CaptchaStore::default(),
+        scheduler_http_safety,
+    };
 
     Ok(Router::new()
         .route("/health", get(health))
@@ -54,6 +77,7 @@ pub fn build_router(
         .merge(common::routes())
         .merge(monitor::log::routes())
         .merge(monitor::online::routes())
+        .merge(scheduler::routes())
         .merge(system::dept::routes())
         .merge(system::dict::routes())
         .merge(system::file::routes())

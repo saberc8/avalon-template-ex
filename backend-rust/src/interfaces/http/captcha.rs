@@ -1,4 +1,8 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use axum::{
     extract::{Query, State},
@@ -20,6 +24,54 @@ const SVG_1X1_BASE64: &str =
 const IMAGE_CAPTCHA_EXPIRATION_SECONDS: i64 = 120;
 const IMAGE_CAPTCHA_CHARS: &[u8] = b"0123456789";
 const LOGIN_CAPTCHA_ENABLED_CODE: &str = "LOGIN_CAPTCHA_ENABLED";
+const CAPTCHA_ERROR_MESSAGE: &str = "验证码错误或已过期";
+
+#[derive(Debug, Clone, Default)]
+pub struct CaptchaStore {
+    challenges: Arc<Mutex<HashMap<String, CaptchaChallenge>>>,
+}
+
+#[derive(Debug, Clone)]
+struct CaptchaChallenge {
+    code: String,
+    expire_time: i64,
+}
+
+impl CaptchaStore {
+    pub fn insert(&self, uuid: String, code: String, expire_time: i64) -> Result<(), AppError> {
+        self.challenges
+            .lock()
+            .map_err(|_| AppError::bad_request("验证码状态异常"))?
+            .insert(uuid, CaptchaChallenge { code, expire_time });
+        Ok(())
+    }
+
+    pub fn verify(&self, uuid: &str, code: &str, now_millis: i64) -> Result<(), AppError> {
+        let uuid = uuid.trim();
+        let code = code.trim();
+        if uuid.is_empty() || code.is_empty() {
+            return Err(AppError::bad_request(CAPTCHA_ERROR_MESSAGE));
+        }
+
+        let mut challenges = self
+            .challenges
+            .lock()
+            .map_err(|_| AppError::bad_request("验证码状态异常"))?;
+        let Some(challenge) = challenges.get(uuid) else {
+            return Err(AppError::bad_request(CAPTCHA_ERROR_MESSAGE));
+        };
+        if challenge.expire_time <= now_millis {
+            challenges.remove(uuid);
+            return Err(AppError::bad_request(CAPTCHA_ERROR_MESSAGE));
+        }
+        if !challenge.code.eq_ignore_ascii_case(code) {
+            return Err(AppError::bad_request(CAPTCHA_ERROR_MESSAGE));
+        }
+
+        challenges.remove(uuid);
+        Ok(())
+    }
+}
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -82,9 +134,13 @@ async fn image(
     }
 
     let code = random_image_captcha_code();
+    let uuid = uuid::Uuid::new_v4().to_string();
+    state
+        .captcha
+        .insert(uuid.clone(), code.clone(), expire_time)?;
     Ok(Json(ApiResponse::ok(enabled_image_captcha_response(
         &code,
-        uuid::Uuid::new_v4().to_string(),
+        uuid,
         expire_time,
     ))))
 }
@@ -126,6 +182,22 @@ WHERE code = $1
     .flatten();
 
     Ok(parse_login_captcha_enabled(value.as_deref()))
+}
+
+pub async fn ensure_login_captcha(
+    state: &AppState,
+    uuid: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), AppError> {
+    if !is_login_captcha_enabled(&state.db).await? {
+        return Ok(());
+    }
+
+    state.captcha.verify(
+        uuid.unwrap_or_default(),
+        code.unwrap_or_default(),
+        current_time_millis(),
+    )
 }
 
 fn parse_login_captcha_enabled(value: Option<&str>) -> bool {
@@ -183,11 +255,14 @@ fn svg_data_url(svg: &str) -> String {
 }
 
 fn image_captcha_expire_time() -> i64 {
-    let now_millis = SystemTime::now()
+    current_time_millis() + IMAGE_CAPTCHA_EXPIRATION_SECONDS * 1000
+}
+
+fn current_time_millis() -> i64 {
+    SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_default();
-    now_millis + IMAGE_CAPTCHA_EXPIRATION_SECONDS * 1000
+        .unwrap_or_default()
 }
 
 fn escape_svg_text(value: &str) -> String {
@@ -256,5 +331,19 @@ mod tests {
 
         assert_eq!(value["repCode"], "0000");
         assert_eq!(value["repMsg"], "成功");
+    }
+
+    #[test]
+    fn captcha_store_requires_matching_code_once() {
+        let store = CaptchaStore::default();
+        let now = current_time_millis();
+        let expire_time = now + IMAGE_CAPTCHA_EXPIRATION_SECONDS * 1000;
+        store
+            .insert("uuid-1".to_owned(), "1234".to_owned(), expire_time)
+            .unwrap();
+
+        assert!(store.verify("uuid-1", "0000", now).is_err());
+        assert!(store.verify("uuid-1", "1234", now).is_ok());
+        assert!(store.verify("uuid-1", "1234", now).is_err());
     }
 }
