@@ -25,6 +25,9 @@ venv/
 # Go
 bin/
 *.out
+*.test
+/backend-go/admin
+/backend-go/test_menus
 
 # Rust
 target/
